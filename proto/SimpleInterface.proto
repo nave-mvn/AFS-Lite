@@ -1,0 +1,16 @@
+syntax = "proto3";
+
+package RpcPackage;
+
+//TOOD:even if define as RPCService, the compiler still outputs RpcService
+service RpcService{
+	// returns the string representation of the provided data
+	rpc rpc_message (StringMessage) returns (StringMessage) {}
+	//rpc double_to_string (StringMessage) returns (StringMessage) {}
+	//rpc string_to_string (StringMessage) returns (StringMessage) {}
+	//rpc vector_to_string (StringMessage) returns (StringMessage) {}
+}
+
+message StringMessage{
+	 string msg = 1;
+} 
