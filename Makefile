@@ -20,7 +20,7 @@ all: clean $(RPC_INTERFACE).pb.cc $(RPC_INTERFACE).grpc.pb.cc venus vice cleanob
 venus: $(PROTOS_PATH)/$(RPC_INTERFACE).pb.o $(PROTOS_PATH)/$(RPC_INTERFACE).grpc.pb.o
 	$(CXX) src/venus.cc `pkg-config fuse --cflags --libs` $(CXXFLAGS) -O $^ $(LDFLAGS) -o $(OUT_PATH)/$@
 
-vice: $(PROTOS_PATH)/$(RPC_INTERFACE).pb.o $(PROTOS_PATH)/$(RPC_INTERFACE).grpc.pb.o $(SRC_PATH)/RPCServer.o
+vice: $(PROTOS_PATH)/$(RPC_INTERFACE).pb.o $(PROTOS_PATH)/$(RPC_INTERFACE).grpc.pb.o $(SRC_PATH)/vice.o
 	$(CXX) -O $^ $(LDFLAGS) -o $(OUT_PATH)/$@
 
 %.grpc.pb.cc: %.proto

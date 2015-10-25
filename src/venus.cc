@@ -41,7 +41,10 @@ std::unique_ptr<RpcService::Stub> stub_;
 
 static int venus_getattr(const char *path, struct stat *stbuf)
 {
+	StringMessage send_message;
+	StringMessage reply_message;
 	printf("path: %s \n", path);
+	ClientContext context;
 	stub_->rpc_message(&context, send_message, &reply_message);
 	int res = 0;
 	memset(stbuf, 0, sizeof(struct stat));
