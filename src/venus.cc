@@ -24,6 +24,8 @@
 #include <grpc++/grpc++.h>
 #include "../proto/SimpleInterface.grpc.pb.h"
 
+using std::cout;
+using std::endl;
 
 using grpc::Channel;
 using grpc::ClientContext;
@@ -39,12 +41,8 @@ std::unique_ptr<RpcService::Stub> stub_;
 
 static int venus_getattr(const char *path, struct stat *stbuf)
 {
-	StringMessage send_message;
-	StringMessage reply_message;
-	ClientContext context;
-	send_message.set_msg("Client");
-	status = stub_->rpc_message(&context, send_message, &reply_message);
-	cout<<reply_message<<endl;
+	printf("path: %s \n", path);
+	stub_->rpc_message(&context, send_message, &reply_message);
 	int res = 0;
 	memset(stbuf, 0, sizeof(struct stat));
 	if (strcmp(path, "/") == 0) {
