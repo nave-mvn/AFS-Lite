@@ -6,14 +6,11 @@ package RpcPackage;
 service RpcService{
 	// returns the string representation of the provided data
 	rpc stat_get_attr (StringMessage) returns (StatStruct) {}
-	//rpc double_to_string (StringMessage) returns (StringMessage) {}
+	rpc readdirectory (StringMessage) returns (DirMessage) {}
+	//rpc  (StringMessage) returns (StringMessage) {}
 	//rpc string_to_string (StringMessage) returns (StringMessage) {}
 	//rpc vector_to_string (StringMessage) returns (StringMessage) {}
 }
-
-message StringMessage{
-	 string msg = 1;
-} 
 
 message StatStruct{
 	 int32 device_id = 1;
@@ -26,4 +23,18 @@ message StatStruct{
 	 int64 time_access = 9;
 	 int64 time_mod = 8;
 	 int64 time_chng = 10;
+} 
+
+message StringMessage{
+	 string msg = 1;
+} 
+
+message DirEntry{
+	string name = 2;
+	StatStruct stat = 1;
+}
+
+message DirMessage{
+	bool success = 2;
+	repeated DirEntry dir = 1;
 } 
