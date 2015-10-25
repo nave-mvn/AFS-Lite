@@ -1,3 +1,7 @@
+/**
+ * The vice server
+ */
+
 #include <iostream>
 #include <string>
 #include <time.h>
@@ -16,7 +20,7 @@ using grpc::Status;
 using RpcPackage::StringMessage;
 using RpcPackage::RpcService;
 
-class SimpleServiceImpl final: public RpcService::Service{
+class Vice final: public RpcService::Service{
 	Status rpc_message(ServerContext* context, const StringMessage* recv_msg, StringMessage* reply_msg) override {
 		//int recv_int = recv_msg->msg();
 		std::string reply = std::string("ACK:" + recv_msg->msg());
@@ -25,7 +29,7 @@ class SimpleServiceImpl final: public RpcService::Service{
 	}
 };
 
-void RunServer() {
+void run_server() {
 	std::string server_address("0.0.0.0:50051");
 	SimpleServiceImpl service;
 
@@ -37,7 +41,7 @@ void RunServer() {
 	builder.RegisterService(&service);
 	// Finally assemble the server.
 	std::unique_ptr<Server> server(builder.BuildAndStart());
-	std::cout << "Server listening on " << server_address << std::endl;
+	std::cout << "Vice Server listening on " << server_address << std::endl;
 
 	// Wait for the server to shutdown. Note that some other thread must be
 	// responsible for shutting down the server for this call to ever return.
@@ -45,6 +49,6 @@ void RunServer() {
 }
 
 int main(int argc, char** argv) {
-	RunServer();
+	run_server();
 	return 0;
 }
