@@ -1,5 +1,9 @@
+#include <iostream>
+#include <fstream>
 #include <time.h>
 #include <algorithm>
+
+using namespace std;
 
 timespec diff(timespec start, timespec end)
 {
@@ -30,4 +34,17 @@ std::string random_string( size_t length )
     return str;
 }
 
+void open_err_log(){
+	std::ofstream ofs;
+	ofs.open("/tmp/err.txt", std::ofstream::out | std::ofstream::trunc);
+	ofs.close();
+}
 
+// Its is difficult to debug the FS calls when the FS runs in the background
+// So open a file and log debugging info it
+void log_err(string error){
+	ofstream err_file;
+  	err_file.open ("/tmp/err.txt", ios::in|ios::app);
+  	err_file << "Writing this to a file ioidofidoif.\n";
+  	err_file.close();
+}

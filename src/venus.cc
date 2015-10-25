@@ -11,18 +11,16 @@
 #define _FILE_OFFSET_BITS 64
 
 #include <fuse.h>
-#include <stdio.h>
-#include <string.h>
 #include <errno.h>
 #include <fcntl.h>
+
 #include <iostream>
-#include <memory>
 #include <string>
-#include <time.h>
-#include <algorithm>
 
 #include <grpc++/grpc++.h>
+
 #include "../proto/AFSInterface.grpc.pb.h"
+#include "util.h"
 
 using std::cout;
 using std::endl;
@@ -109,6 +107,7 @@ static int venus_read(const char *path, char *buf, size_t size, off_t offset,
 
 int main(int argc, char *argv[])
 {
+	open_err_log();
 	static struct fuse_operations venus_oper;
 	venus_oper.getattr = venus_getattr;
 	venus_oper.readdir = venus_readdir;
