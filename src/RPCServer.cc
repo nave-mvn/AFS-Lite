@@ -31,7 +31,7 @@ class Vice final: public RpcService::Service{
 
 void run_server() {
 	std::string server_address("0.0.0.0:50051");
-	SimpleServiceImpl service;
+	Vice service;
 
 	ServerBuilder builder;
 	// Listen on the given address without any authentication mechanism.

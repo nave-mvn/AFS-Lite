@@ -2,24 +2,49 @@
  * This is the implementation of the AFS client, Venus, which runs on the client workstation.
  * Venus is implemented on top of the FUSE library and runs as a user-level process.
  * Venus is responsible for 
-	- Serving file system requests through contacting Vice
-	- Maintaining a cached copy of the frequently used files in local drive
-	- Ensuring the cached copies are consistent with the original files on the Vice server at times of read / write
-*/
+ - Serving file system requests through contacting Vice
+ - Maintaining a cached copy of the frequently used files in local drive
+ - Ensuring the cached copies are consistent with the original files on the Vice server at times of read / write
+ */
 
 #define FUSE_USE_VERSION 26
+#define _FILE_OFFSET_BITS 64
 
 #include <fuse.h>
 #include <stdio.h>
 #include <string.h>
 #include <errno.h>
 #include <fcntl.h>
+#include <iostream>
+#include <memory>
+#include <string>
+#include <time.h>
+#include <algorithm>
+
+#include <grpc++/grpc++.h>
+#include "../proto/SimpleInterface.grpc.pb.h"
+
+
+using grpc::Channel;
+using grpc::ClientContext;
+using grpc::Status;
+
+using RpcPackage::StringMessage;
+using RpcPackage::RpcService;
 
 static const char *venus_str = "Hello World!\n";
 static const char *venus_path = "/hello";
 
+std::unique_ptr<RpcService::Stub> stub_;
+
 static int venus_getattr(const char *path, struct stat *stbuf)
 {
+	StringMessage send_message;
+	StringMessage reply_message;
+	ClientContext context;
+	send_message.set_msg("Client");
+	status = stub_->rpc_message(&context, send_message, &reply_message);
+	cout<<reply_message<<endl;
 	int res = 0;
 	memset(stbuf, 0, sizeof(struct stat));
 	if (strcmp(path, "/") == 0) {
@@ -36,7 +61,7 @@ static int venus_getattr(const char *path, struct stat *stbuf)
 }
 
 static int venus_readdir(const char *path, void *buf, fuse_fill_dir_t filler,
-			 off_t offset, struct fuse_file_info *fi)
+		off_t offset, struct fuse_file_info *fi)
 {
 	(void) offset;
 	(void) fi;
@@ -63,7 +88,7 @@ static int venus_open(const char *path, struct fuse_file_info *fi)
 }
 
 static int venus_read(const char *path, char *buf, size_t size, off_t offset,
-		      struct fuse_file_info *fi)
+		struct fuse_file_info *fi)
 {
 	size_t len;
 	(void) fi;
@@ -81,14 +106,14 @@ static int venus_read(const char *path, char *buf, size_t size, off_t offset,
 	return size;
 }
 
-static struct fuse_operations venus_oper = {
-	.getattr	= venus_getattr,
-	.readdir	= venus_readdir,
-	.open		= venus_open,
-	.read		= venus_read,
-};
-
 int main(int argc, char *argv[])
 {
+	static struct fuse_operations venus_oper;
+	venus_oper.getattr = venus_getattr;
+	venus_oper.readdir = venus_readdir;
+	venus_oper.open = venus_open;
+	venus_oper.read = venus_read;
+	std::shared_ptr<grpc::Channel> channel = grpc::CreateChannel("192.168.1.126:50051", grpc::InsecureCredentials());
+	stub_ = RpcService::NewStub(channel);
 	return fuse_main(argc, argv, &venus_oper, NULL);
 }

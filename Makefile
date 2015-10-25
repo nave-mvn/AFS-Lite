@@ -16,11 +16,11 @@ vpath %.proto $(PROTOS_PATH)
 
 all: clean $(RPC_INTERFACE).pb.cc $(RPC_INTERFACE).grpc.pb.cc rpc_client rpc_server
 
-# TODO - the RPC client and server should be a shared library and not have main functions as they have now. The rpc client should expose a interface to the venus and the rpc server should provide callbacks for vice to register to.
-rpc_client: $(PROTOS_PATH)/$(RPC_INTERFACE).pb.o $(PROTOS_PATH)/$(RPC_INTERFACE).grpc.pb.o $(SRC_PATH)/RPCClient.o
-	$(CXX) -O $^ $(LDFLAGS) -o $(OUT_PATH)/$@
+#No idea of how this c/c++ gluing works but it does! :)
+venus: $(PROTOS_PATH)/$(RPC_INTERFACE).pb.o $(PROTOS_PATH)/$(RPC_INTERFACE).grpc.pb.o
+	$(CXX) src/venus.cc `pkg-config fuse --cflags --libs` $(CXXFLAGS) -O $^ $(LDFLAGS) -o $(OUT_PATH)/$@
 
-rpc_server: $(PROTOS_PATH)/$(RPC_INTERFACE).pb.o $(PROTOS_PATH)/$(RPC_INTERFACE).grpc.pb.o $(SRC_PATH)/RPCServer.o
+vice: $(PROTOS_PATH)/$(RPC_INTERFACE).pb.o $(PROTOS_PATH)/$(RPC_INTERFACE).grpc.pb.o $(SRC_PATH)/RPCServer.o
 	$(CXX) -O $^ $(LDFLAGS) -o $(OUT_PATH)/$@
 
 %.grpc.pb.cc: %.proto
