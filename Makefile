@@ -10,7 +10,7 @@ PROTOS_PATH = proto
 SRC_PATH = src
 OUT_PATH = bin
 
-RPC_INTERFACE = SimpleInterface
+RPC_INTERFACE = AFSInterface
 
 vpath %.proto $(PROTOS_PATH)
 

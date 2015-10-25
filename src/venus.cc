@@ -22,7 +22,7 @@
 #include <algorithm>
 
 #include <grpc++/grpc++.h>
-#include "../proto/SimpleInterface.grpc.pb.h"
+#include "../proto/AFSInterface.grpc.pb.h"
 
 using std::cout;
 using std::endl;
