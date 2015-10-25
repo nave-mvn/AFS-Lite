@@ -14,7 +14,7 @@ RPC_INTERFACE = SimpleInterface
 
 vpath %.proto $(PROTOS_PATH)
 
-all: clean $(RPC_INTERFACE).pb.cc $(RPC_INTERFACE).grpc.pb.cc rpc_client rpc_server
+all: clean $(RPC_INTERFACE).pb.cc $(RPC_INTERFACE).grpc.pb.cc venus vice cleanobj
 
 #No idea of how this c/c++ gluing works but it does! :)
 venus: $(PROTOS_PATH)/$(RPC_INTERFACE).pb.o $(PROTOS_PATH)/$(RPC_INTERFACE).grpc.pb.o
@@ -31,3 +31,6 @@ vice: $(PROTOS_PATH)/$(RPC_INTERFACE).pb.o $(PROTOS_PATH)/$(RPC_INTERFACE).grpc.
 
 clean:
 	rm -f $(SRC_PATH)/*.o $(PROTOS_PATH)/*.pb.* $(OUT_PATH)/*
+
+cleanobj:
+	rm -f $(SRC_PATH)/*.o
