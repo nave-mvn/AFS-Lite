@@ -29,6 +29,8 @@ using grpc::Channel;
 using grpc::ClientContext;
 using grpc::Status;
 
+using RpcPackage::DirMessage;
+using RpcPackage::DirEntry;
 using RpcPackage::StringMessage;
 using RpcPackage::StatStruct;
 using RpcPackage::RpcService;
@@ -53,6 +55,7 @@ static int venus_getattr(const char *path, struct stat *stbuf)
 	}
 	ClientContext context;
 	Status status;
+	send_path.set_msg(string(path));
 	status = stub_->stat_get_attr(&context, send_path, &reply);
 	if(status.ok()){
 		stbuf->st_dev = reply.device_id();
@@ -65,6 +68,7 @@ static int venus_getattr(const char *path, struct stat *stbuf)
 		stbuf->st_atime = reply.time_access();
 		stbuf->st_mtime = reply.time_mod();
 		stbuf->st_ctime = reply.time_chng();
+		log("%i", stbuf->st_ino);
 	}
 	else{
 		res = -ENOENT;
@@ -75,17 +79,36 @@ static int venus_getattr(const char *path, struct stat *stbuf)
 static int venus_readdir(const char *path, void *buf, fuse_fill_dir_t filler,
 		off_t offset, struct fuse_file_info *fi)
 {
-	(void) offset;
-	(void) fi;
-
-	if (strcmp(path, "/") != 0)
-		return -ENOENT;
-
-	filler(buf, ".", NULL, 0);
-	filler(buf, "..", NULL, 0);
-	filler(buf, venus_path + 1, NULL, 0);
-
-	return 0;
+	int res = 0;
+	StringMessage send_path;
+	DirMessage reply;
+	log("path: %s \n", path);
+	ClientContext context;
+	Status status;
+	send_path.set_msg(string(path));
+	status = stub_->readdirectory(&context, send_path, &reply);
+	if(status.ok()){
+		int size = reply.dir_size();
+		if(reply.success() == false){
+			log("Returning false");
+			return -ENOENT;
+		}
+		log("Size: %i", size);
+		for(int i=0; i<size; ++i){
+			DirEntry entry = reply.dir(i);
+			struct stat st;
+                	memset(&st, 0, sizeof(st));
+                	st.st_ino = entry.stat().file_number();
+                	st.st_mode = entry.stat().file_mode();
+                	if (filler(buf, entry.name().c_str(), &st, 0)){
+				break;
+			}
+		}
+	}
+	else{
+		res = -ENOENT;
+	}
+	return res;
 }
 
 static int venus_open(const char *path, struct fuse_file_info *fi)
