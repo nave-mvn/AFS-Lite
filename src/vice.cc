@@ -5,12 +5,16 @@
 #include <iostream>
 #include <string>
 #include <time.h>
+#include <fcntl.h>
 
 #include <grpc++/grpc++.h>
 
 #include "../proto/AFSInterface.grpc.pb.h"
 
 #include "util.h"
+
+using std::cout;
+using std::endl;
 
 using grpc::Server;
 using grpc::ServerBuilder;
@@ -22,9 +26,11 @@ using RpcPackage::StatStruct;
 using RpcPackage::RpcService;
 
 class Vice final: public RpcService::Service{
-	Status stat_get_attr(ServerContext* context, const StringMessage* recv_msg, StatStruct* reply) override {
+	Status stat_get_attr(ServerContext* context, const StringMessage* recv_msg, StatStruct* reply_struct) override {
 		std::string reply = std::string("ACK:" + recv_msg->msg());
-		reply_msg->set_msg(reply);
+		reply_struct->set_file_mode(S_IFREG | 0444);
+		reply_struct->set_hard_links(1);
+		reply_struct->set_file_size(4096);
 		return Status::OK;
 	}
 };
@@ -49,6 +55,7 @@ void run_server() {
 }
 
 int main(int argc, char** argv) {
+	cout<<string(argv[1])<<endl;
 	run_server();
 	return 0;
 }
