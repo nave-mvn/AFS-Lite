@@ -30,32 +30,45 @@ using grpc::ClientContext;
 using grpc::Status;
 
 using RpcPackage::StringMessage;
+using RpcPackage::StatStruct;
 using RpcPackage::RpcService;
 
 static const char *venus_str = "Hello World!\n";
 static const char *venus_path = "/hello";
 
+// The stub holds the RPC connection. In global scope.
 std::unique_ptr<RpcService::Stub> stub_;
 
 static int venus_getattr(const char *path, struct stat *stbuf)
 {
-	StringMessage send_message;
-	StringMessage reply_message;
-	printf("path: %s \n", path);
-	ClientContext context;
-	stub_->rpc_message(&context, send_message, &reply_message);
-	int res = 0;
+	StringMessage send_path;
+	StatStruct reply;
+	log("path: %s \n", path);
 	memset(stbuf, 0, sizeof(struct stat));
-	if (strcmp(path, "/") == 0) {
+	int res = 0;
+	if(strcmp(path, "/") == 0) {
 		stbuf->st_mode = S_IFDIR | 0755;
 		stbuf->st_nlink = 2;
-	} else if (strcmp(path, venus_path) == 0) {
-		stbuf->st_mode = S_IFREG | 0444;
-		stbuf->st_nlink = 1;
-		stbuf->st_size = strlen(venus_str);
-	} else
+		return res;
+	}
+	ClientContext context;
+	Status status;
+	status = stub_->stat_get_attr(&context, send_path, &reply);
+	if(status.ok()){
+		stbuf->st_dev = reply.device_id();
+		stbuf->st_ino = reply.file_number();
+		stbuf->st_mode = reply.file_mode();
+		stbuf->st_nlink = reply.hard_links();
+		stbuf->st_uid = reply.user_id();
+		stbuf->st_gid = reply.group_id();
+		stbuf->st_size = reply.file_size();
+		stbuf->st_atime = reply.time_access();
+		stbuf->st_mtime = reply.time_mod();
+		stbuf->st_ctime = reply.time_chng();
+	}
+	else{
 		res = -ENOENT;
-
+	}
 	return res;
 }
 

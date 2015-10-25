@@ -45,7 +45,7 @@ void open_err_log(){
 
 // Its is difficult to debug the FS calls when the FS runs in the background
 // So open a file and log debugging info it
-void log_err(const std::string fmt_str, ...) {
+void log(const std::string fmt_str, ...) {
 	int final_n, n = ((int)fmt_str.size()) * 2; /* Reserve two times as much as the length of the fmt_str */
 	std::string str;
 	std::unique_ptr<char[]> formatted;

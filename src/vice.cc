@@ -18,11 +18,11 @@ using grpc::ServerContext;
 using grpc::Status;
 
 using RpcPackage::StringMessage;
+using RpcPackage::StatStruct;
 using RpcPackage::RpcService;
 
 class Vice final: public RpcService::Service{
-	Status rpc_message(ServerContext* context, const StringMessage* recv_msg, StringMessage* reply_msg) override {
-		//int recv_int = recv_msg->msg();
+	Status stat_get_attr(ServerContext* context, const StringMessage* recv_msg, StatStruct* reply) override {
 		std::string reply = std::string("ACK:" + recv_msg->msg());
 		reply_msg->set_msg(reply);
 		return Status::OK;

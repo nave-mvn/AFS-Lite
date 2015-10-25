@@ -5,7 +5,7 @@ package RpcPackage;
 //TOOD:even if define as RPCService, the compiler still outputs RpcService
 service RpcService{
 	// returns the string representation of the provided data
-	rpc rpc_message (StringMessage) returns (StringMessage) {}
+	rpc stat_get_attr (StringMessage) returns (StatStruct) {}
 	//rpc double_to_string (StringMessage) returns (StringMessage) {}
 	//rpc string_to_string (StringMessage) returns (StringMessage) {}
 	//rpc vector_to_string (StringMessage) returns (StringMessage) {}
@@ -13,4 +13,17 @@ service RpcService{
 
 message StringMessage{
 	 string msg = 1;
+} 
+
+message StatStruct{
+	 int32 device_id = 1;
+	 int32 file_number = 2;
+	 int32 file_mode = 3;
+	 int32 hard_links = 4;
+	 int32 user_id = 5;
+	 int32 group_id = 6;
+	 int64 file_size = 7;
+	 int64 time_access = 9;
+	 int64 time_mod = 8;
+	 int64 time_chng = 10;
 } 
