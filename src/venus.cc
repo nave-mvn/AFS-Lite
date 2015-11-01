@@ -83,6 +83,13 @@ static int venus_statfs(const char *path, struct statvfs *stbuf)
         return 0;
 }
 
+static int venus_read(const char *path, char *buf, size_t size, off_t offset,
+		struct fuse_file_info *fi)
+{
+	log("statfs called");
+        return 0;
+}
+
 static int venus_getattr(const char *path, struct stat *stbuf)
 {
 	StringMessage send_path;
@@ -154,13 +161,6 @@ static int venus_readdir(const char *path, void *buf, fuse_fill_dir_t filler,
 	return res;
 }
 
-static int venus_read(const char *path, char *buf, size_t size, off_t offset,
-		struct fuse_file_info *fi)
-{
-	log("statfs called");
-        return 0;
-}
-
 int main(int argc, char *argv[])
 {
 	open_err_log();
@@ -169,6 +169,11 @@ int main(int argc, char *argv[])
 	venus_oper.readdir = venus_readdir;
 	venus_oper.open = venus_open;
 	venus_oper.read = venus_read;
+	venus_oper.chown = venus_chown;
+	venus_oper.access = venus_access;
+	venus_oper.getxattr = venus_getxattr;
+	venus_oper.fsync = venus_fsync;
+	venus_oper.statfs = venus_statfs;
 	std::shared_ptr<grpc::Channel> channel = grpc::CreateChannel("192.168.1.126:50051", grpc::InsecureCredentials());
 	stub_ = RpcService::NewStub(channel);
 	return fuse_main(argc, argv, &venus_oper, NULL);
