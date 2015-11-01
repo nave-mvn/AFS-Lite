@@ -49,7 +49,7 @@ static int venus_getattr(const char *path, struct stat *stbuf)
 	memset(stbuf, 0, sizeof(struct stat));
 	int res = 0;
 	if(strcmp(path, "/") == 0) {
-		stbuf->st_mode = S_IFDIR | 0755;
+		stbuf->st_mode = S_IFDIR;
 		stbuf->st_nlink = 2;
 		return res;
 	}
@@ -98,8 +98,9 @@ static int venus_readdir(const char *path, void *buf, fuse_fill_dir_t filler,
 			DirEntry entry = reply.dir(i);
 			struct stat st;
                 	memset(&st, 0, sizeof(st));
-                	st.st_ino = entry.stat().file_number();
-                	st.st_mode = entry.stat().file_mode();
+                	st.st_ino = entry.file_number();
+                	st.st_mode = entry.file_mode();
+			log("Name:" + entry.name());
                 	if (filler(buf, entry.name().c_str(), &st, 0)){
 				break;
 			}
