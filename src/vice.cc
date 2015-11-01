@@ -9,6 +9,7 @@
 
 #include <sys/stat.h>
 #include <dirent.h>
+#include <unistd.h>
 
 #include <grpc++/grpc++.h>
 
@@ -24,6 +25,7 @@ using grpc::ServerBuilder;
 using grpc::ServerContext;
 using grpc::Status;
 
+using RpcPackage::IntMessage;
 using RpcPackage::StringMessage;
 using RpcPackage::StatStruct;
 using RpcPackage::DirMessage;
@@ -33,6 +35,21 @@ using RpcPackage::RpcService;
 std::string* root_dir;
 
 class Vice final: public RpcService::Service{
+	Status openfile(ServerContext* context, const StringMessage* recv_msg, IntMessage* reply_msg) override {
+		log("openfile request received");
+		string full_path = *root_dir + recv_msg->msg();
+		log(full_path);
+        	int res = open(full_path.c_str(), O_RDWR);
+        	if (res == -1){
+			reply_msg->set_msg(-errno);
+		}
+		else{
+			reply_msg->set_msg(res);
+		}
+        	close(res);
+		log("--------------------------------------------------");
+		return Status::OK;
+}
 	Status stat_get_attr(ServerContext* context, const StringMessage* recv_msg, StatStruct* reply_struct) override {
 		log("get_attr request received");
 		struct stat stbuf;
