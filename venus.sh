@@ -9,9 +9,9 @@ if [[ $1 == '-m' ]]
 then
 	if [[ $2 == '-f' ]]
 	then
-		bin/venus -f $FS_PATH
+		bin/venus -f -s $FS_PATH
 	else
-		bin/venus $FS_PATH
+		bin/venus -s $FS_PATH
 	fi
 fi		
 
