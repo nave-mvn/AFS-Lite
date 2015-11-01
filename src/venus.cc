@@ -103,10 +103,18 @@ static int venus_open(const char *path, struct fuse_file_info *fi)
 	status = stub_->openfile(&context, send_path, &reply);
 	if(status.ok()){
 		log("Returning open status");
-       		res = reply.msg(); 
+       		int fh = reply.msg(); 
+		if(fh != -errno){
+			log("Returning file handle as %i", fh);
+			fi->fh = fh;
+		}
+		else{
+			log("Error opening file");
+			res = -errno;
+		}
 	}
 	else{
-		log("Could not open file");
+		log("Fuse connection error in open");
 		res = -errno;
 	}
 	log("----------------------");
