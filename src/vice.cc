@@ -40,7 +40,8 @@ class Vice final: public RpcService::Service{
 		log(recv_msg->msg());
 		log(full_path);
 		int res = lstat(full_path.c_str(), &stbuf);
-		reply_struct->set_file_mode(S_IFREG | 0444);
+		//reply_struct->set_file_mode(S_IFREG | 0444);
+		reply_struct->set_file_mode(S_IFDIR);
 		reply_struct->set_hard_links(1);
 		reply_struct->set_file_size(4096);
 		return Status::OK;
@@ -49,7 +50,6 @@ class Vice final: public RpcService::Service{
 	Status readdirectory(ServerContext* context, const StringMessage* recv_msg, DirMessage* reply_msg) override {
 		DIR *dp;
 		struct dirent *de;
-
 		dp = opendir("/home/naveen/afs-server-root");
 		if (dp == NULL){
 			cout<<"Dir is Null"<<endl;
@@ -65,7 +65,7 @@ class Vice final: public RpcService::Service{
 			log(de->d_name);
 			c++;
 		}
-
+		reply_msg->set_success(true);
 		closedir(dp);
 		log("--------------------------------------------------");
 		return Status::OK;
