@@ -40,10 +40,13 @@ class Vice final: public RpcService::Service{
 		log(recv_msg->msg());
 		log(full_path);
 		int res = lstat(full_path.c_str(), &stbuf);
-		//reply_struct->set_file_mode(S_IFREG | 0444);
-		reply_struct->set_file_mode(S_IFDIR);
-		reply_struct->set_hard_links(1);
-		reply_struct->set_file_size(4096);
+		reply_struct->set_file_number(stbuf.st_ino);
+		reply_struct->set_time_access(stbuf.st_atime);
+		reply_struct->set_time_mod(stbuf.st_mtime);
+		reply_struct->set_time_chng(stbuf.st_ctime);
+		reply_struct->set_file_mode(stbuf.st_mode);
+		reply_struct->set_hard_links(stbuf.st_nlink);
+		reply_struct->set_file_size(stbuf.st_size);
 		return Status::OK;
 	}
 
