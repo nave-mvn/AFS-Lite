@@ -34,10 +34,10 @@ std::string* root_dir;
 
 class Vice final: public RpcService::Service{
 	Status stat_get_attr(ServerContext* context, const StringMessage* recv_msg, StatStruct* reply_struct) override {
+		log("get_attr request received");
 		struct stat stbuf;
 		memset(&stbuf, 0, sizeof(struct stat));
 		string full_path = *root_dir + recv_msg->msg();
-		log(recv_msg->msg());
 		log(full_path);
 		int res = lstat(full_path.c_str(), &stbuf);
 		reply_struct->set_file_number(stbuf.st_ino);
@@ -47,26 +47,27 @@ class Vice final: public RpcService::Service{
 		reply_struct->set_file_mode(stbuf.st_mode);
 		reply_struct->set_hard_links(stbuf.st_nlink);
 		reply_struct->set_file_size(stbuf.st_size);
+		log("--------------------------------------------------");
 		return Status::OK;
 	}
 
 	Status readdirectory(ServerContext* context, const StringMessage* recv_msg, DirMessage* reply_msg) override {
+		log("readdir request received");
 		DIR *dp;
 		struct dirent *de;
-		dp = opendir("/home/naveen/afs-server-root");
+		string full_path = *root_dir + recv_msg->msg();
+		log(full_path);
+		dp = opendir(full_path.c_str());
 		if (dp == NULL){
-			cout<<"Dir is Null"<<endl;
+			log("Dir is Null");
 			return Status::OK;
 		}
-		int c = 0;
 		while ((de = readdir(dp)) != NULL) {
-			log("%i",c);
 			DirEntry* ent = reply_msg->add_dir();
 			ent->set_file_number(de->d_ino);
 			ent->set_file_mode(de->d_type<<12);
 			ent->set_name(de->d_name);
 			log(de->d_name);
-			c++;
 		}
 		reply_msg->set_success(true);
 		closedir(dp);
