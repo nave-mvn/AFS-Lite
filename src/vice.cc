@@ -45,62 +45,32 @@ class Vice final: public RpcService::Service{
 		reply_struct->set_file_size(4096);
 		return Status::OK;
 	}
-	/*
-	   Status readdirectory(ServerContext* context, const StringMessage* recv_msg, DirMessage* reply_msg) override {
-	   string full_path = *root_dir + recv_msg->msg();
-	   log("read dir called " + full_path);
-	   DIR *dp;
-	   dp = opendir(full_path.c_str());
-	   log("opened dir \n");
-	   if (dp == NULL){
-	   reply_msg->set_success(false);
-	   return Status::OK;
-	   }
-	   log("not returning false \n");
-	   reply_msg->set_success(true);
-	   while (true) {
-	   struct dirent *de;
-	   if((de = readdir(dp)) == NULL){
-	   break;
-	   }
-	   log("reading struct 1 \n");
-	   struct stat st;
-	   memset(&st, 0, sizeof(st));
-	   DirEntry dirEntry;
-	   StatStruct stat;
-	   log("reading struct 2 \n");
-	   stat.set_file_number(de->d_ino);
-	   stat.set_file_mode(de->d_type << 12);
-	   dirEntry.set_allocated_stat(&stat);
-	   log("reading struct 3 \n");
-	   DirEntry* ent = reply_msg->add_dir();
-	   ent->set_name(de->d_name);
-	   log("reading struct 4 -" + string(de->d_name) + "\n");
-	   free(de);
-	   }
-	   log("about to close \n");
-	   closedir(dp);
-	   return Status::OK;
-	   }*/
 
 	Status readdirectory(ServerContext* context, const StringMessage* recv_msg, DirMessage* reply_msg) override {
-		DIR *dirp;
-    		struct dirent *dp;
-		string full_path = *root_dir + recv_msg->msg();
-		log("read dir called " + full_path);
-		if ((dirp = opendir(full_path.c_str())) == NULL) {
-			perror("couldn't open '.'");
+		DIR *dp;
+		struct dirent *de;
+
+		dp = opendir("/home/naveen/afs-server-root");
+		if (dp == NULL){
+			cout<<"Dir is Null"<<endl;
 			return Status::OK;
 		}
-		do {
-			errno = 0;
-			if ((dp = readdir(dirp)) != NULL) {
-				log("found\n");
-			}
-		} while (dp != NULL);
-		closedir(dirp);
+		int c = 0;
+		while ((de = readdir(dp)) != NULL) {
+			log("%i",c);
+			DirEntry* ent = reply_msg->add_dir();
+			ent->set_file_number(de->d_ino);
+			ent->set_file_mode(de->d_type<<12);
+			ent->set_name(de->d_name);
+			log(de->d_name);
+			c++;
+		}
+
+		closedir(dp);
+		log("--------------------------------------------------");
 		return Status::OK;
 	}
+
 };
 
 void run_server() {

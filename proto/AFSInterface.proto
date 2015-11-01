@@ -30,8 +30,9 @@ message StringMessage{
 } 
 
 message DirEntry{
-	string name = 2;
-	StatStruct stat = 1;
+	string name = 1;
+	int32 file_number = 2;
+	int32 file_mode = 3;
 }
 
 message DirMessage{
