@@ -33,6 +33,7 @@ using RpcPackage::DirMessage;
 using RpcPackage::DirEntry;
 using RpcPackage::StringMessage;
 using RpcPackage::StatStruct;
+using RpcPackage::IntMessage;
 using RpcPackage::RpcService;
 
 static const char *venus_str = "Hello World!\n";
@@ -49,8 +50,8 @@ static int venus_chown(const char *path, uid_t uid, gid_t gid)
 
 static int venus_access(const char *path, int mask)
 {
-	log("access called");
-        return 0;
+        // only one user, access to all files, return 0 always
+	return 0;
 }
 
 
@@ -58,6 +59,12 @@ static int venus_getxattr(const char *path, const char *name, char *value,
                         size_t size)
 {
 	log("getxattr called");
+        return 0;
+}
+
+static int venus_opendir(const char *path, struct fuse_file_info *fi)
+{
+	log("opendir called");
         return 0;
 }
 
@@ -70,13 +77,6 @@ static int venus_fsync(const char *path, int isdatasync,
         return 0;
 }
 
-static int venus_open(const char *path, struct fuse_file_info *fi)
-{
-	log("open called");
-        return 0;
-}
-
-
 static int venus_statfs(const char *path, struct statvfs *stbuf)
 {
 	log("statfs called");
@@ -86,15 +86,39 @@ static int venus_statfs(const char *path, struct statvfs *stbuf)
 static int venus_read(const char *path, char *buf, size_t size, off_t offset,
 		struct fuse_file_info *fi)
 {
-	log("statfs called");
+	log("read file called");
         return 0;
+}
+
+static int venus_open(const char *path, struct fuse_file_info *fi)
+{
+	log("open file called");
+	StringMessage send_path;
+	IntMessage reply;
+	log("path: %s", path);
+	int res = 0;
+	ClientContext context;
+	Status status;
+	send_path.set_msg(string(path));
+	status = stub_->openfile(&context, send_path, &reply);
+	if(status.ok()){
+		log("Returning open status");
+       		res = reply.msg(); 
+	}
+	else{
+		log("Could not open file");
+		res = -errno;
+	}
+	log("----------------------");
+	return res;
 }
 
 static int venus_getattr(const char *path, struct stat *stbuf)
 {
+	log("getattr called");
 	StringMessage send_path;
 	StatStruct reply;
-	log("path: %s \n", path);
+	log("path: %s", path);
 	memset(stbuf, 0, sizeof(struct stat));
 	int res = 0;
 	if(strcmp(path, "/") == 0) {
@@ -117,21 +141,22 @@ static int venus_getattr(const char *path, struct stat *stbuf)
 		stbuf->st_atime = reply.time_access();
 		stbuf->st_mtime = reply.time_mod();
 		stbuf->st_ctime = reply.time_chng();
-		log("%i", stbuf->st_ino);
 	}
 	else{
 		res = -ENOENT;
 	}
+	log("----------------------");
 	return res;
 }
 
 static int venus_readdir(const char *path, void *buf, fuse_fill_dir_t filler,
 		off_t offset, struct fuse_file_info *fi)
 {
+	log("readdir called");
 	int res = 0;
 	StringMessage send_path;
 	DirMessage reply;
-	log("path: %s \n", path);
+	log("path: %s", path);
 	ClientContext context;
 	Status status;
 	send_path.set_msg(string(path));
@@ -142,14 +167,13 @@ static int venus_readdir(const char *path, void *buf, fuse_fill_dir_t filler,
 			log("Returning false");
 			return -ENOENT;
 		}
-		log("Size: %i", size);
 		for(int i=0; i<size; ++i){
 			DirEntry entry = reply.dir(i);
 			struct stat st;
                 	memset(&st, 0, sizeof(st));
                 	st.st_ino = entry.file_number();
                 	st.st_mode = entry.file_mode();
-			log("Name:" + entry.name());
+			log(entry.name());
                 	if (filler(buf, entry.name().c_str(), &st, 0)){
 				break;
 			}
@@ -158,6 +182,7 @@ static int venus_readdir(const char *path, void *buf, fuse_fill_dir_t filler,
 	else{
 		res = -ENOENT;
 	}
+	log("----------------------");
 	return res;
 }
 

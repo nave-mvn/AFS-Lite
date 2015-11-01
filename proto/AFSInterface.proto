@@ -2,13 +2,14 @@ syntax = "proto3";
 
 package RpcPackage;
 
-//TOOD:even if define as RPCService, the compiler still outputs RpcService
+//TOOD:even if defined as RPCService, the compiler still outputs RpcService
 service RpcService{
 	// returns the string representation of the provided data
 	rpc stat_get_attr (StringMessage) returns (StatStruct) {}
 	rpc readdirectory (StringMessage) returns (DirMessage) {}
-	//rpc  (StringMessage) returns (StringMessage) {}
-	//rpc string_to_string (StringMessage) returns (StringMessage) {}
+	rpc accessdir (StringMessage) returns (DirMessage) {}
+	rpc openfile (StringMessage) returns (IntMessage) {}
+	rpc readfie (ReadMessageReq) returns (ByteBuffer) {}
 	//rpc vector_to_string (StringMessage) returns (StringMessage) {}
 }
 
@@ -27,6 +28,20 @@ message StatStruct{
 
 message StringMessage{
 	 string msg = 1;
+} 
+
+message ReadMessageReq{
+	 string path = 1;
+	 int32 size = 2;
+	 int32 offset = 3;
+} 
+
+message ByteBuffer{
+	repeated bytes byte = 1; 
+}
+
+message IntMessage{
+	 int32 msg = 1;
 } 
 
 message DirEntry{
