@@ -23,6 +23,9 @@ venus: $(PROTOS_PATH)/$(RPC_INTERFACE).pb.o $(PROTOS_PATH)/$(RPC_INTERFACE).grpc
 vice: $(PROTOS_PATH)/$(RPC_INTERFACE).pb.o $(PROTOS_PATH)/$(RPC_INTERFACE).grpc.pb.o $(SRC_PATH)/vice.o
 	$(CXX) -O $^ $(LDFLAGS) -o $(OUT_PATH)/$@
 
+client: $(PROTOS_PATH)/$(RPC_INTERFACE).pb.o $(PROTOS_PATH)/$(RPC_INTERFACE).grpc.pb.o $(SRC_PATH)/client.o
+	$(CXX) -O $^ $(LDFLAGS) -o $(OUT_PATH)/$@
+
 %.grpc.pb.cc: %.proto
 	$(PROTOC) -I $(PROTOS_PATH) --grpc_out=$(PROTOS_PATH) --plugin=protoc-gen-grpc=$(GRPC_CPP_PLUGIN_PATH) $<
 
