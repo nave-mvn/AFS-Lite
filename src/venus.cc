@@ -41,6 +41,48 @@ static const char *venus_path = "/hello";
 // The stub holds the RPC connection. In global scope.
 std::unique_ptr<RpcService::Stub> stub_;
 
+static int venus_chown(const char *path, uid_t uid, gid_t gid)
+{
+	log("chown called");
+        return 0;
+}
+
+static int venus_access(const char *path, int mask)
+{
+	log("access called");
+        return 0;
+}
+
+
+static int venus_getxattr(const char *path, const char *name, char *value,
+                        size_t size)
+{
+	log("getxattr called");
+        return 0;
+}
+
+static int venus_fsync(const char *path, int isdatasync,
+                     struct fuse_file_info *fi)
+{
+        /* Just a stub.  This method is optional and can safely be left
+           unimplemented */
+	log("fsync called");
+        return 0;
+}
+
+static int venus_open(const char *path, struct fuse_file_info *fi)
+{
+	log("open called");
+        return 0;
+}
+
+
+static int venus_statfs(const char *path, struct statvfs *stbuf)
+{
+	log("statfs called");
+        return 0;
+}
+
 static int venus_getattr(const char *path, struct stat *stbuf)
 {
 	StringMessage send_path;
@@ -112,34 +154,11 @@ static int venus_readdir(const char *path, void *buf, fuse_fill_dir_t filler,
 	return res;
 }
 
-static int venus_open(const char *path, struct fuse_file_info *fi)
-{
-	if (strcmp(path, venus_path) != 0)
-		return -ENOENT;
-
-	if ((fi->flags & 3) != O_RDONLY)
-		return -EACCES;
-
-	return 0;
-}
-
 static int venus_read(const char *path, char *buf, size_t size, off_t offset,
 		struct fuse_file_info *fi)
 {
-	size_t len;
-	(void) fi;
-	if(strcmp(path, venus_path) != 0)
-		return -ENOENT;
-
-	len = strlen(venus_str);
-	if (offset < len) {
-		if (offset + size > len)
-			size = len - offset;
-		memcpy(buf, venus_str + offset, size);
-	} else
-		size = 0;
-
-	return size;
+	log("statfs called");
+        return 0;
 }
 
 int main(int argc, char *argv[])
