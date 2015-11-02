@@ -37,7 +37,7 @@ using grpc::Channel;
 using grpc::ClientContext;
 using grpc::Status;
 
-using RpcPackage::ByteBuffer;
+using RpcPackage::BytesMessage;
 using RpcPackage::DirMessage;
 using RpcPackage::DirEntry;
 using RpcPackage::StringMessage;
@@ -152,15 +152,15 @@ static int venus_open(const char *path, struct fuse_file_info *fi)
 		return 0;
 	}
 	ReadMessage read_msg;
-	StringMessage file;
+	BytesMessage file;
 	read_msg.set_path(string(path));
 	read_msg.set_clientid(client_id);
 	ClientContext context;
-	std::unique_ptr<ClientReader<StringMessage> > reader(stub_->readfile(&context, read_msg));
+	std::unique_ptr<ClientReader<BytesMessage> > reader(stub_->readfile(&context, read_msg));
 	ofstream output_file;
 	string cached_file_name = string(*cache_dir_path).append(random_string(10));
 	log("file name " + cached_file_name);
-	output_file.open(cached_file_name, ios::out|ios::binary);
+	output_file.open(cached_file_name, ios::out);
 	while (reader->Read(&file)) {
 		output_file.write(file.msg().c_str(), sizeof(char));
 	}
@@ -299,5 +299,6 @@ int main(int argc, char *argv[])
 	venus_oper.statfs = venus_statfs;
 	std::shared_ptr<grpc::Channel> channel = grpc::CreateChannel("192.168.1.126:50051", grpc::InsecureCredentials());
 	stub_ = RpcService::NewStub(channel);
+	argc = 3;
 	return fuse_main(argc, argv, &venus_oper, NULL);
 }
