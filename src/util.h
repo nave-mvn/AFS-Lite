@@ -1,3 +1,5 @@
+#include <string>
+#include <sstream>
 #include <iostream>
 #include <fstream>
 #include <time.h>
@@ -7,6 +9,12 @@
 
 
 using namespace std;
+
+string int_to_string(int a){
+	stringstream ss;
+	ss << a;
+	return ss.str();
+}
 
 timespec diff(timespec start, timespec end)
 {

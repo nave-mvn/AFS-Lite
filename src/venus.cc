@@ -14,6 +14,9 @@
 #include <errno.h>
 #include <fcntl.h>
 
+#include <stdlib.h>
+#include <stdio.h>
+
 #include <fstream>
 #include <iostream>
 #include <string>
@@ -40,25 +43,30 @@ using RpcPackage::DirEntry;
 using RpcPackage::StringMessage;
 using RpcPackage::StatStruct;
 using RpcPackage::IntMessage;
+using RpcPackage::ReadMessage;
 using RpcPackage::BooleanMessage;
 using RpcPackage::RpcService;
 
+#define CACHE_SIZE 5
+
+int client_id;
 // hardcoded string -- have to change if hosting client on any other machine
-static const char *cache_dir_path = "/home/naveen/.afs_cache/";
+static const char *cache_dir = "/home/naveen/.afs_cache";
+static string* cache_dir_path;
 
 // The stub holds the RPC connection. In global scope.
 std::unique_ptr<RpcService::Stub> stub_;
 
 std::map<string, string>* cached_files;
-std::vector<string>* cached_files_order;
+std::map<string, long>* cached_files_timestamp;
 
 void make_cache_dir(){
 	struct stat sb;
-	if(stat(cache_dir_path, &sb) == 0 && S_ISDIR(sb.st_mode)){
+	if(stat(cache_dir_path->c_str(), &sb) == 0 && S_ISDIR(sb.st_mode)){
 		log("Cache directory present");
 	}
 	else{
-		if(mkdir(cache_dir_path, 0777) == -1){
+		if(mkdir(cache_dir_path->c_str(), 0777) == -1){
 			log("Failed to create cache directory");
 		}
 		else{
@@ -143,13 +151,14 @@ static int venus_open(const char *path, struct fuse_file_info *fi)
 		// do local read
 		return 0;
 	}
-	StringMessage file_path;
+	ReadMessage read_msg;
 	StringMessage file;
-	file_path.set_msg(string(path));
+	read_msg.set_path(string(path));
+	read_msg.set_clientid(client_id);
 	ClientContext context;
-	std::unique_ptr<ClientReader<StringMessage> > reader(stub_->readfile(&context, file));
+	std::unique_ptr<ClientReader<StringMessage> > reader(stub_->readfile(&context, read_msg));
 	ofstream output_file;
-	string cached_file_name = string(cache_dir_path).append(random_string(10));
+	string cached_file_name = string(*cache_dir_path).append(random_string(10));
 	log("file name " + cached_file_name);
 	output_file.open(cached_file_name, ios::out|ios::binary);
 	while (reader->Read(&file)) {
@@ -272,10 +281,12 @@ static int venus_readdir(const char *path, void *buf, fuse_fill_dir_t filler, of
 
 int main(int argc, char *argv[])
 {
+	client_id = atoi(argv[3]);
+	cache_dir_path = new string(string(cache_dir).append(int_to_string(client_id)).append("/"));
 	open_err_log();
 	make_cache_dir();
 	cached_files = new std::map<string, string>();
-	cached_files_order = new std::vector<string>(5);
+	cached_files_timestamp = new std::map<string, long>();
 	static struct fuse_operations venus_oper;
 	venus_oper.getattr = venus_getattr;
 	venus_oper.readdir = venus_readdir;
