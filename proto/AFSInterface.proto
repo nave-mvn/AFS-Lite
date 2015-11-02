@@ -8,8 +8,8 @@ service RpcService{
 	rpc stat_get_attr (StringMessage) returns (StatStruct) {}
 	rpc readdirectory (StringMessage) returns (DirMessage) {}
 	rpc accessdir (StringMessage) returns (DirMessage) {}
-	rpc openfile (StringMessage) returns (StringMessage) {}
-	//rpc vector_to_string (StringMessage) returns (StringMessage) {}
+	rpc readfile (StringMessage) returns (stream StringMessage) {}
+	rpc writefile (stream StringMessage) returns (BooleanMessage) {}
 }
 
 message StatStruct{
@@ -25,14 +25,12 @@ message StatStruct{
 	 int64 time_chng = 10;
 } 
 
-message StringMessage{
-	 string msg = 1;
+message BooleanMessage{
+	 bool msg = 1;
 } 
 
-message ReadMessageReq{
-	 string path = 1;
-	 int32 size = 2;
-	 int32 offset = 3;
+message StringMessage{
+	 string msg = 1;
 } 
 
 message ByteBuffer{

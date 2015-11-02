@@ -14,6 +14,7 @@
 #include <errno.h>
 #include <fcntl.h>
 
+#include <fstream>
 #include <iostream>
 #include <string>
 
@@ -24,101 +25,177 @@
 
 using std::cout;
 using std::endl;
+using std::string;
 
+using grpc::ClientReader;
+using grpc::ClientReaderWriter;
+using grpc::ClientWriter;
 using grpc::Channel;
 using grpc::ClientContext;
 using grpc::Status;
 
+using RpcPackage::ByteBuffer;
 using RpcPackage::DirMessage;
 using RpcPackage::DirEntry;
 using RpcPackage::StringMessage;
 using RpcPackage::StatStruct;
 using RpcPackage::IntMessage;
+using RpcPackage::BooleanMessage;
 using RpcPackage::RpcService;
 
-static const char *venus_str = "Hello World!\n";
-static const char *venus_path = "/hello";
+// hardcoded string -- have to change if hosting client on any other machine
+static const char *cache_dir_path = "/home/naveen/.afs_cache/";
 
 // The stub holds the RPC connection. In global scope.
 std::unique_ptr<RpcService::Stub> stub_;
 
+std::map<string, string>* cached_files;
+std::vector<string>* cached_files_order;
+
+void make_cache_dir(){
+	struct stat sb;
+	if(stat(cache_dir_path, &sb) == 0 && S_ISDIR(sb.st_mode)){
+		log("Cache directory present");
+	}
+	else{
+		if(mkdir(cache_dir_path, 0777) == -1){
+			log("Failed to create cache directory");
+		}
+		else{
+			log("Cache dir created");
+		}
+	}	
+}
+
 static int venus_chown(const char *path, uid_t uid, gid_t gid)
 {
 	log("chown called");
-        return 0;
+	return 0;
 }
 
 static int venus_access(const char *path, int mask)
 {
-        // only one user, access to all files, return 0 always
+	// only one user, access to all files, return 0 always
 	return 0;
 }
 
-
-static int venus_getxattr(const char *path, const char *name, char *value,
-                        size_t size)
+static int venus_getxattr(const char *path, const char *name, char *value, size_t size)
 {
 	log("getxattr called");
-        return 0;
+	return 0;
 }
 
 static int venus_opendir(const char *path, struct fuse_file_info *fi)
 {
 	log("opendir called");
-        return 0;
+	return 0;
 }
 
-static int venus_fsync(const char *path, int isdatasync,
-                     struct fuse_file_info *fi)
+static int venus_fsync(const char *path, int isdatasync, struct fuse_file_info *fi)
 {
-        /* Just a stub.  This method is optional and can safely be left
-           unimplemented */
+	/* Just a stub.  This method is optional and can safely be left
+	   unimplemented */
 	log("fsync called");
-        return 0;
+	return 0;
 }
 
 static int venus_statfs(const char *path, struct statvfs *stbuf)
 {
 	log("statfs called");
-        return 0;
+	return 0;
 }
 
 static int venus_read(const char *path, char *buf, size_t size, off_t offset,
 		struct fuse_file_info *fi)
 {
 	log("read file called");
-        return 0;
+	int res = 0;
+	/*
+	   ReadMessageReq send_msg;
+	   ByteBuffer reply;
+	   log("path: %s", path);
+	   ClientContext context;
+	   Status status;
+	   send_msg.set_path(string(path));
+	   send_msg.set_size(size);
+	   send_msg.set_offset(offset);
+	   status = stub_->readfile(&context, send_msg, &reply);
+	   if(status.ok()){
+	   log("Read %i chars" + reply->byte_size());
+	   res = reply->byte_size();
+	   }
+	   else{
+	   log("Read error");
+	   res = -errno;
+	   }
+	   log("----------------------");
+	 */
+	return res;
 }
 
 static int venus_open(const char *path, struct fuse_file_info *fi)
 {
 	log("open file called");
-	StringMessage send_path;
-	IntMessage reply;
 	log("path: %s", path);
-	int res = 0;
+	std::map<string, string>::iterator cached_files_it = cached_files->find(string(path));
+	if(cached_files_it != cached_files->end()){
+		log("File found in local cache " + string(path));
+		// do local read
+		return 0;
+	}
+	StringMessage file_path;
+	StringMessage file;
+	file_path.set_msg(string(path));
 	ClientContext context;
-	Status status;
-	send_path.set_msg(string(path));
-	status = stub_->openfile(&context, send_path, &reply);
-	if(status.ok()){
-		log("Returning open status");
-       		int fh = reply.msg(); 
-		if(fh != -errno){
-			log("Returning file handle as %i", fh);
-			fi->fh = fh;
-		}
-		else{
-			log("Error opening file");
-			res = -errno;
-		}
+	std::unique_ptr<ClientReader<StringMessage> > reader(stub_->readfile(&context, file));
+	ofstream output_file;
+	string cached_file_name = string(cache_dir_path).append(random_string(10));
+	log("file name " + cached_file_name);
+	output_file.open(cached_file_name, ios::out|ios::binary);
+	while (reader->Read(&file)) {
+		output_file.write(file.msg().c_str(), sizeof(char));
 	}
-	else{
-		log("Fuse connection error in open");
-		res = -errno;
+	Status status = reader->Finish();
+	if (status.ok()) {
+		log("Inital read download succeeded");
+	} 
+	else {
+		log("Inital read download failed");
 	}
-	log("----------------------");
-	return res;
+	output_file.close();
+
+	/*
+	   static int venus_open(const char *path, struct fuse_file_info *fi)
+	   {
+	   log("open file called");
+	   StringMessage send_path;
+	   IntMessage reply;
+	   log("path: %s", path);
+	   int res = 0;
+	   ClientContext context;
+	   Status status;
+	   send_path.set_msg(string(path));
+	   status = stub_->openfile(&context, send_path, &reply);
+	   if(status.ok()){
+	   log("Returning open status");
+	   int fh = reply.msg(); 
+	   if(fh != -errno){
+	   log("Returning file handle as %i", fh);
+	   fi->fh = fh;
+	   }
+	   else{
+	   log("Error opening file");
+	   res = -errno;
+	   }
+	   }
+	   else{
+	   log("Fuse connection error in open");
+	   res = -errno;
+	   }
+	   log("----------------------");
+	   return res;
+	   }
+	 */
 }
 
 static int venus_getattr(const char *path, struct stat *stbuf)
@@ -157,8 +234,7 @@ static int venus_getattr(const char *path, struct stat *stbuf)
 	return res;
 }
 
-static int venus_readdir(const char *path, void *buf, fuse_fill_dir_t filler,
-		off_t offset, struct fuse_file_info *fi)
+static int venus_readdir(const char *path, void *buf, fuse_fill_dir_t filler, off_t offset, struct fuse_file_info *fi)
 {
 	log("readdir called");
 	int res = 0;
@@ -178,11 +254,11 @@ static int venus_readdir(const char *path, void *buf, fuse_fill_dir_t filler,
 		for(int i=0; i<size; ++i){
 			DirEntry entry = reply.dir(i);
 			struct stat st;
-                	memset(&st, 0, sizeof(st));
-                	st.st_ino = entry.file_number();
-                	st.st_mode = entry.file_mode();
+			memset(&st, 0, sizeof(st));
+			st.st_ino = entry.file_number();
+			st.st_mode = entry.file_mode();
 			log(entry.name());
-                	if (filler(buf, entry.name().c_str(), &st, 0)){
+			if (filler(buf, entry.name().c_str(), &st, 0)){
 				break;
 			}
 		}
@@ -197,6 +273,9 @@ static int venus_readdir(const char *path, void *buf, fuse_fill_dir_t filler,
 int main(int argc, char *argv[])
 {
 	open_err_log();
+	make_cache_dir();
+	cached_files = new std::map<string, string>();
+	cached_files_order = new std::vector<string>(5);
 	static struct fuse_operations venus_oper;
 	venus_oper.getattr = venus_getattr;
 	venus_oper.readdir = venus_readdir;
