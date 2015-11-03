@@ -16,6 +16,7 @@
 
 #include <stdlib.h>
 #include <stdio.h>
+#include <time.h>
 
 #include <fstream>
 #include <iostream>
@@ -59,6 +60,39 @@ std::unique_ptr<RpcService::Stub> stub_;
 
 std::map<string, string>* cached_files;
 std::map<string, long>* cached_files_timestamp;
+
+int read_file_into_cache(const char* path){
+	StringMessage file_path;
+	BytesMessage file;
+	file_path.set_msg(path);
+	ClientContext context;
+	std::unique_ptr<ClientReader<BytesMessage> > reader(stub_->readfile(&context, file_path));
+	ofstream output_file;
+	string cached_file_name;
+	// wow a do-while loop!
+	// get a unique hash name
+	do{
+		string cached_file_name = string(*cache_dir_path).append(random_string(10));
+	}while(cached_files->find(cached_file_name) == cached_files->end());
+	log("caching file" + cached_file_name);
+	output_file.open(cached_file_name, ios::out);
+	while (reader->Read(&file)){
+		log("Received %i", file.size());
+		output_file.write(file.msg().c_str(), file.size());
+	}
+	Status status = reader->Finish();
+	if (status.ok()) {
+		log("Inital read download succeeded");
+		cached_files->insert(std::pair<string, string>(string(path), cached_file_name)); 
+		cached_files_timestamp->insert(std::pair<string, long>(string(path), time(NULL))); 
+		return 0;
+	} 
+	else {
+		log("Inital read download failed");
+		return -1;
+	}
+	output_file.close();
+}
 
 void make_cache_dir(){
 	struct stat sb;
@@ -148,63 +182,9 @@ static int venus_open(const char *path, struct fuse_file_info *fi)
 	std::map<string, string>::iterator cached_files_it = cached_files->find(string(path));
 	if(cached_files_it != cached_files->end()){
 		log("File found in local cache " + string(path));
-		// do local read
 		return 0;
 	}
-	ReadMessage read_msg;
-	BytesMessage file;
-	read_msg.set_path(string(path));
-	read_msg.set_clientid(client_id);
-	ClientContext context;
-	std::unique_ptr<ClientReader<BytesMessage> > reader(stub_->readfile(&context, read_msg));
-	ofstream output_file;
-	string cached_file_name = string(*cache_dir_path).append(random_string(10));
-	log("file name " + cached_file_name);
-	output_file.open(cached_file_name, ios::out);
-	while (reader->Read(&file)) {
-		output_file.write(file.msg().c_str(), sizeof(char));
-	}
-	Status status = reader->Finish();
-	if (status.ok()) {
-		log("Inital read download succeeded");
-	} 
-	else {
-		log("Inital read download failed");
-	}
-	output_file.close();
-
-	/*
-	   static int venus_open(const char *path, struct fuse_file_info *fi)
-	   {
-	   log("open file called");
-	   StringMessage send_path;
-	   IntMessage reply;
-	   log("path: %s", path);
-	   int res = 0;
-	   ClientContext context;
-	   Status status;
-	   send_path.set_msg(string(path));
-	   status = stub_->openfile(&context, send_path, &reply);
-	   if(status.ok()){
-	   log("Returning open status");
-	   int fh = reply.msg(); 
-	   if(fh != -errno){
-	   log("Returning file handle as %i", fh);
-	   fi->fh = fh;
-	   }
-	   else{
-	   log("Error opening file");
-	   res = -errno;
-	   }
-	   }
-	   else{
-	   log("Fuse connection error in open");
-	   res = -errno;
-	   }
-	   log("----------------------");
-	   return res;
-	   }
-	 */
+	return read_file_into_cache(path);
 }
 
 static int venus_getattr(const char *path, struct stat *stbuf)
