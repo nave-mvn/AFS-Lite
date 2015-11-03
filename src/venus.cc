@@ -13,6 +13,7 @@
 #include <fuse.h>
 #include <errno.h>
 #include <fcntl.h>
+#include <unistd.h>
 
 #include <stdlib.h>
 #include <stdio.h>
@@ -59,7 +60,9 @@ static string* cache_dir_path;
 std::unique_ptr<RpcService::Stub> stub_;
 
 std::map<string, string>* cached_files;
-std::map<string, long>* cached_files_timestamp;
+std::map<string, long>* cached_files_remote_modified;
+
+std::map<string, long>* cached_files_local_access;//does not need to be persisted
 
 int read_file_into_cache(const char* path){
 	StringMessage file_path;
@@ -71,9 +74,10 @@ int read_file_into_cache(const char* path){
 	string cached_file_name;
 	// wow a do-while loop!
 	// get a unique hash name
+	log("generating unique name");
 	do{
-		string cached_file_name = string(*cache_dir_path).append(random_string(10));
-	}while(cached_files->find(cached_file_name) == cached_files->end());
+		cached_file_name = string(*cache_dir_path).append(random_string(10));
+	}while(cached_files->find(cached_file_name) != cached_files->end());
 	log("caching file" + cached_file_name);
 	output_file.open(cached_file_name, ios::out);
 	while (reader->Read(&file)){
@@ -84,12 +88,12 @@ int read_file_into_cache(const char* path){
 	if (status.ok()) {
 		log("Inital read download succeeded");
 		cached_files->insert(std::pair<string, string>(string(path), cached_file_name)); 
-		cached_files_timestamp->insert(std::pair<string, long>(string(path), time(NULL))); 
+		cached_files_remote_modified->insert(std::pair<string, long>(string(path), time(NULL))); 
 		return 0;
 	} 
 	else {
 		log("Inital read download failed");
-		return -1;
+		return -errno;
 	}
 	output_file.close();
 }
@@ -147,36 +151,47 @@ static int venus_statfs(const char *path, struct statvfs *stbuf)
 	return 0;
 }
 
-static int venus_read(const char *path, char *buf, size_t size, off_t offset,
-		struct fuse_file_info *fi)
+static int venus_read(const char *path, char *buf, size_t size, off_t offset, struct fuse_file_info *fi)
 {
 	log("read file called");
-	int res = 0;
-	/*
-	   ReadMessageReq send_msg;
-	   ByteBuffer reply;
-	   log("path: %s", path);
-	   ClientContext context;
-	   Status status;
-	   send_msg.set_path(string(path));
-	   send_msg.set_size(size);
-	   send_msg.set_offset(offset);
-	   status = stub_->readfile(&context, send_msg, &reply);
-	   if(status.ok()){
-	   log("Read %i chars" + reply->byte_size());
-	   res = reply->byte_size();
-	   }
-	   else{
-	   log("Read error");
-	   res = -errno;
-	   }
-	   log("----------------------");
-	 */
-	return res;
+	log("path: %s", path);
+	std::map<string, string>::iterator cached_files_it = cached_files->find(string(path));
+	if(cached_files_it == cached_files->end()){
+		log("File not in cache...caching");
+		int res = read_file_into_cache(path);
+		if(res == -1){
+			return -errno;
+		}
+		cached_files_it = cached_files->find(string(path)); 
+		if(cached_files_it == cached_files->end()){
+			log("Still cannot find file -- THIS SHOULD NOT HAPPEN");
+			return -errno;
+		}
+	}
+	// check if invalidate cache
+	log("File in cache..begin reading");
+	int fd;
+        int res;
+	log("Cached file location: " + cached_files_it->second);
+        string cached_path = cached_files_it->second;
+	log("Opening.." + cached_path);
+	fd = open(cached_path.c_str(), O_RDONLY);
+        if (fd == -1){
+		log("Could not open local file");
+                return -errno;
+	}
+        res = pread(fd, buf, size, offset);
+        if (res == -1){
+		log("Could not read local file");
+                return -errno;
+	}
+        close(fd);
+        return res;
 }
 
 static int venus_open(const char *path, struct fuse_file_info *fi)
 {
+	//set file access time
 	log("open file called");
 	log("path: %s", path);
 	std::map<string, string>::iterator cached_files_it = cached_files->find(string(path));
@@ -266,7 +281,8 @@ int main(int argc, char *argv[])
 	open_err_log();
 	make_cache_dir();
 	cached_files = new std::map<string, string>();
-	cached_files_timestamp = new std::map<string, long>();
+	cached_files_remote_modified = new std::map<string, long>();
+	cached_files_local_access = new std::map<string, long>();
 	static struct fuse_operations venus_oper;
 	venus_oper.getattr = venus_getattr;
 	venus_oper.readdir = venus_readdir;
