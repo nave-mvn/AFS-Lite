@@ -322,7 +322,8 @@ int main(int argc, char *argv[])
 	venus_oper.getxattr = venus_getxattr;
 	venus_oper.fsync = venus_fsync;
 	venus_oper.statfs = venus_statfs;
-	std::shared_ptr<grpc::Channel> channel = grpc::CreateChannel("192.168.1.126:50051", grpc::InsecureCredentials());
+	//std::shared_ptr<grpc::Channel> channel = grpc::CreateChannel("192.168.1.126:50051", grpc::InsecureCredentials());
+	std::shared_ptr<grpc::Channel> channel = grpc::CreateChannel("128.105.35.117:50051", grpc::InsecureCredentials());
 	stub_ = RpcService::NewStub(channel);
 	argc = 3;
 	return fuse_main(argc, argv, &venus_oper, NULL);
