@@ -33,6 +33,7 @@ using grpc::ServerWriter;
 using grpc::ServerContext;
 using grpc::Status;
 
+using RpcPackage::LongMessage;
 using RpcPackage::IntMessage;
 using RpcPackage::BytesMessage;
 using RpcPackage::ReadMessage;
@@ -48,6 +49,20 @@ std::string* root_dir;
 
 class Vice final: public RpcService::Service{
 
+	static long get_file_modified_time(string full_path){
+		struct stat attr;
+    		stat(full_path.c_str(), &attr);
+    		long timestamp = (long)attr.st_mtime;
+		return timestamp;
+	}
+	
+	Status filetime(ServerContext* context, const StringMessage* recv_msg, LongMessage* reply) override {
+		log("read request received");
+		string full_path = *root_dir + recv_msg->msg();
+		log(full_path);
+		reply->set_msg(get_file_modified_time(full_path));	
+	}
+
 	Status readfile(ServerContext* context, const StringMessage* recv_msg, ServerWriter<BytesMessage>* writer) override {
 		log("read request received");
 		string full_path = *root_dir + recv_msg->msg();
@@ -57,6 +72,7 @@ class Vice final: public RpcService::Service{
 			log("Error in opening file"); 
 			return Status::CANCELLED;
 		}
+    		long timestamp = get_file_modified_time(full_path);
 		char buffer[BUF_SIZE];
 		for(;;){
 			size_t n = fread(buffer, 1, BUF_SIZE, pFile);
@@ -64,6 +80,7 @@ class Vice final: public RpcService::Service{
 			log("Read %i", n);
 			bytes.set_msg(buffer, n);
 			bytes.set_size(n);
+			bytes.set_timestamp(timestamp);
 			writer->Write(bytes);	
 			if (n < BUF_SIZE) { 
 				log("breaking");
