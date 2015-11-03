@@ -6,6 +6,12 @@
 #include <string>
 #include <time.h>
 #include <fcntl.h>
+#include <stdlib.h>
+#include <stdio.h>
+
+#include <fstream>
+#include <iostream>
+#include <string>
 
 #include <sys/stat.h>
 #include <dirent.h>
@@ -19,13 +25,17 @@
 
 using std::cout;
 using std::endl;
+using std::string;
 
 using grpc::Server;
 using grpc::ServerBuilder;
+using grpc::ServerWriter;
 using grpc::ServerContext;
 using grpc::Status;
 
 using RpcPackage::IntMessage;
+using RpcPackage::BytesMessage;
+using RpcPackage::ReadMessage;
 using RpcPackage::StringMessage;
 using RpcPackage::StatStruct;
 using RpcPackage::DirMessage;
@@ -33,14 +43,29 @@ using RpcPackage::DirEntry;
 using RpcPackage::RpcService;
 
 std::string* root_dir;
+std::map<int, std::map<string, long> >* files_checked_out;
 
 class Vice final: public RpcService::Service{
-	
-	Status openfile(ServerContext* context, const StringMessage* recv_msg, StringMessage* reply_msg) override {
-		log("openfile request received");
-		string full_path = *root_dir + recv_msg->msg();
+
+	Status readfile(ServerContext* context, const ReadMessage* recv_msg, ServerWriter<BytesMessage>* writer) override {
+		log("read request received");
+		string full_path = *root_dir + recv_msg->path();
 		log(full_path);
-		reply_msg->set_msg(full_path);
+		int clientid = recv_msg->clientid();
+		std::fstream inf(full_path, std::ios::in);
+		char data;
+		int bytes = 0;
+		while( !inf.eof() ) {
+			log("%c", data);
+			bytes++;
+			BytesMessage f;
+			f.set_msg(&data);
+			writer->Write(f);
+    		}
+		log("Bytes read: %i", bytes);
+		inf.close();
+		// log as checked out
+		//files_checkout
 		log("--------------------------------------------------");
 		return Status::OK;
 	}
@@ -111,6 +136,7 @@ void run_server() {
 int main(int argc, char** argv) {
 	open_err_log();
 	root_dir = new string(argv[1]);
+	files_checked_out = new std::map<int, std::map<string, long> >();
 	run_server();
 	return 0;
 }
