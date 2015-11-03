@@ -47,6 +47,7 @@ using RpcPackage::StatStruct;
 using RpcPackage::IntMessage;
 using RpcPackage::ReadMessage;
 using RpcPackage::BooleanMessage;
+using RpcPackage::LongMessage;
 using RpcPackage::RpcService;
 
 #define CACHE_SIZE 5
@@ -63,6 +64,22 @@ std::map<string, string>* cached_files;
 std::map<string, long>* cached_files_remote_modified;
 
 std::map<string, long>* cached_files_local_access;//does not need to be persisted
+
+static int get_modified_timestamp(char* path, long* timestamp){
+	ClientContext context;
+	Status status;
+	StringMessage file_path;
+	LongMessage file_mod;
+	file_path.set_msg(string(path));
+	status = stub_->filetime(&context, file_path, &file_mod);
+	if(status.ok()){
+		*timestamp = file_mod.msg();
+		return 0;
+	}
+	else{
+		return -1;
+	}	
+}
 
 int read_file_into_cache(const char* path){
 	StringMessage file_path;
@@ -91,6 +108,7 @@ int read_file_into_cache(const char* path){
 		log("Inital read download succeeded");
 		cached_files->insert(std::pair<string, string>(string(path), cached_file_name)); 
 		cached_files_remote_modified->insert(std::pair<string, long>(string(path), remote_timestamp)); 
+		log("Remote timestamp is %lu", remote_timestamp);
 		return 0;
 	} 
 	else {
@@ -170,7 +188,6 @@ static int venus_read(const char *path, char *buf, size_t size, off_t offset, st
 			return -errno;
 		}
 	}
-	// check if invalidate cache
 	log("File in cache..begin reading");
 	int fd;
 	int res;
@@ -203,6 +220,7 @@ static int venus_open(const char *path, struct fuse_file_info *fi)
 			return -errno;
 		}
 	}
+	// check if invalidate cache
 	std::map<string, long>::iterator cached_files_access_it = cached_files_local_access->find(string(path));
 	if(cached_files_access_it == cached_files_local_access->end()){
 		cached_files_local_access->insert(std::pair<string, long>(string(path), time(NULL)));

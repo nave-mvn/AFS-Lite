@@ -9,6 +9,7 @@ service RpcService{
 	rpc readdirectory (StringMessage) returns (DirMessage) {}
 	rpc accessdir (StringMessage) returns (DirMessage) {}
 	rpc readfile (StringMessage) returns (stream BytesMessage) {}
+	rpc filetime (StringMessage) returns (LongMessage) {}
 	rpc writefile (stream StringMessage) returns (BooleanMessage) {}
 }
 
@@ -50,6 +51,10 @@ message ByteBuffer{
 
 message IntMessage{
 	 int32 msg = 1;
+} 
+
+message LongMessage{
+	 sint64 msg = 1;
 } 
 
 message DirEntry{
