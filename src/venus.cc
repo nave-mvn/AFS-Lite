@@ -65,7 +65,38 @@ std::map<string, long>* cached_files_remote_modified;
 
 std::map<string, long>* cached_files_local_access;//does not need to be persisted
 
-static int get_modified_timestamp(char* path, long* timestamp){
+static int invalidate_local_cache(const char* path){
+	log("invalidating file %s", path);
+	std::map<string, string>::iterator cached_files_it = cached_files->find(string(path));
+	if(cached_files_it == cached_files->end()){
+		log("file not in cache map!");
+		return -1;
+	}
+	string path_to_remove = cached_files_it->second;
+	int ret = remove(path_to_remove.c_str());
+	if(ret == 0) 
+	{
+		log("file deleted successfully");
+		cached_files->erase(cached_files_it);
+		std::map<string, long>::iterator cached_files_mod_it = cached_files_remote_modified->find(string(path));
+		if(cached_files_mod_it != cached_files_remote_modified->end()){
+			cached_files_remote_modified->erase(cached_files_mod_it);
+		}
+		std::map<string, long>::iterator cached_files_local_it = cached_files_local_access->find(string(path));
+		if(cached_files_local_it != cached_files_local_access->end()){
+			cached_files_local_access->erase(cached_files_local_it);
+		}
+		return 0;
+	}
+	else 
+	{
+		log("file remove unsuccessfull %s", path);
+		return -1;
+	}
+}
+
+static int get_modified_timestamp(const char* path, long* timestamp){
+	log("Fetching modified timestamp");
 	ClientContext context;
 	Status status;
 	StringMessage file_path;
@@ -205,6 +236,7 @@ static int venus_read(const char *path, char *buf, size_t size, off_t offset, st
 		return -errno;
 	}
 	close(fd);
+	log("----------------------");
 	return res;
 }
 
@@ -220,7 +252,21 @@ static int venus_open(const char *path, struct fuse_file_info *fi)
 			return -errno;
 		}
 	}
-	// check if invalidate cache
+	log("Checking modified time ");
+	long file_last_mod_local = cached_files_remote_modified->find(string(path))->second;
+	long file_last_mod_remote;
+	if((get_modified_timestamp(path, &file_last_mod_remote) == -1)){
+		return -errno;
+	}
+	if(file_last_mod_remote > file_last_mod_local){
+		log("File not of sync with Remote, revalidating local cache");
+		if(invalidate_local_cache(path) == -1){
+			return -errno;
+		}
+		if(read_file_into_cache(path) == -1){
+			return -errno;
+		}
+	}	
 	std::map<string, long>::iterator cached_files_access_it = cached_files_local_access->find(string(path));
 	if(cached_files_access_it == cached_files_local_access->end()){
 		cached_files_local_access->insert(std::pair<string, long>(string(path), time(NULL)));
@@ -228,6 +274,7 @@ static int venus_open(const char *path, struct fuse_file_info *fi)
 	else{
 		cached_files_access_it->second = time(NULL);
 	}
+	log("----------------------");
 	return 0;
 }
 
