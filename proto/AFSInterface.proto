@@ -34,8 +34,9 @@ message StringMessage{
 } 
 
 message BytesMessage{
-	 bytes msg = 1;
-	 int32 size = 2;
+	bytes msg = 1;
+	int32 size = 2;
+	sint64 timestamp = 3;
 } 
 
 message ReadMessage{

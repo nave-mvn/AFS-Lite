@@ -80,15 +80,17 @@ int read_file_into_cache(const char* path){
 	}while(cached_files->find(cached_file_name) != cached_files->end());
 	log("caching file" + cached_file_name);
 	output_file.open(cached_file_name, ios::out);
+	long remote_timestamp = 0;
 	while (reader->Read(&file)){
 		log("Received %i", file.size());
 		output_file.write(file.msg().c_str(), file.size());
+		remote_timestamp = file.timestamp();
 	}
 	Status status = reader->Finish();
 	if (status.ok()) {
 		log("Inital read download succeeded");
 		cached_files->insert(std::pair<string, string>(string(path), cached_file_name)); 
-		cached_files_remote_modified->insert(std::pair<string, long>(string(path), time(NULL))); 
+		cached_files_remote_modified->insert(std::pair<string, long>(string(path), remote_timestamp)); 
 		return 0;
 	} 
 	else {
@@ -171,22 +173,22 @@ static int venus_read(const char *path, char *buf, size_t size, off_t offset, st
 	// check if invalidate cache
 	log("File in cache..begin reading");
 	int fd;
-        int res;
+	int res;
 	log("Cached file location: " + cached_files_it->second);
-        string cached_path = cached_files_it->second;
+	string cached_path = cached_files_it->second;
 	log("Opening.." + cached_path);
 	fd = open(cached_path.c_str(), O_RDONLY);
-        if (fd == -1){
+	if (fd == -1){
 		log("Could not open local file");
-                return -errno;
+		return -errno;
 	}
-        res = pread(fd, buf, size, offset);
-        if (res == -1){
+	res = pread(fd, buf, size, offset);
+	if (res == -1){
 		log("Could not read local file");
-                return -errno;
+		return -errno;
 	}
-        close(fd);
-        return res;
+	close(fd);
+	return res;
 }
 
 static int venus_open(const char *path, struct fuse_file_info *fi)
@@ -195,11 +197,20 @@ static int venus_open(const char *path, struct fuse_file_info *fi)
 	log("open file called");
 	log("path: %s", path);
 	std::map<string, string>::iterator cached_files_it = cached_files->find(string(path));
-	if(cached_files_it != cached_files->end()){
-		log("File found in local cache " + string(path));
-		return 0;
+	if(cached_files_it == cached_files->end()){
+		log("File not found in local cache " + string(path));
+		if(read_file_into_cache(path) == -1){
+			return -errno;
+		}
 	}
-	return read_file_into_cache(path);
+	std::map<string, long>::iterator cached_files_access_it = cached_files_local_access->find(string(path));
+	if(cached_files_access_it == cached_files_local_access->end()){
+		cached_files_local_access->insert(std::pair<string, long>(string(path), time(NULL)));
+	}
+	else{
+		cached_files_access_it->second = time(NULL);
+	}
+	return 0;
 }
 
 static int venus_getattr(const char *path, struct stat *stbuf)
