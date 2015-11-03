@@ -47,20 +47,25 @@ using RpcPackage::RpcService;
 
 std::string* root_dir;
 
+/*
+void get_file_modified_time(string full_path, long* timestamp){
+	log("Call to get file modified time"); 
+}
+*/
+
 class Vice final: public RpcService::Service{
 
-	static long get_file_modified_time(string full_path){
-		struct stat attr;
-    		stat(full_path.c_str(), &attr);
-    		long timestamp = (long)attr.st_mtime;
-		return timestamp;
-	}
-	
 	Status filetime(ServerContext* context, const StringMessage* recv_msg, LongMessage* reply) override {
 		log("read request received");
 		string full_path = *root_dir + recv_msg->msg();
 		log(full_path);
-		reply->set_msg(get_file_modified_time(full_path));	
+		struct stat attr;
+		stat(full_path.c_str(), &attr);
+		log("stat call returned"); 
+		long timestamp = (long)attr.st_mtime;
+		log("timestamp call2 returned"); 
+		reply->set_msg(timestamp);
+		return Status::OK;
 	}
 
 	Status readfile(ServerContext* context, const StringMessage* recv_msg, ServerWriter<BytesMessage>* writer) override {
@@ -72,7 +77,11 @@ class Vice final: public RpcService::Service{
 			log("Error in opening file"); 
 			return Status::CANCELLED;
 		}
-    		long timestamp = get_file_modified_time(full_path);
+		struct stat attr;
+		stat(full_path.c_str(), &attr);
+		log("stat call returned"); 
+		long timestamp = (long)attr.st_mtime;
+		log("timestamp call2 returned"); 
 		char buffer[BUF_SIZE];
 		for(;;){
 			size_t n = fread(buffer, 1, BUF_SIZE, pFile);
@@ -87,6 +96,7 @@ class Vice final: public RpcService::Service{
 				break; 
 			}
 		}
+		log("closing read file"); 
 		fclose(pFile);
 		log("--------------------------------------------------");
 		return Status::OK;
