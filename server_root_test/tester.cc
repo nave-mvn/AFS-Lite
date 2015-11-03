@@ -18,7 +18,7 @@ int main(){
 
    	std::ofstream myfile;
    	myfile.open("output.txt");
-	pFile = fopen ("small_file.txt" , "rb");
+	pFile = fopen ("large_files/hs_err_pid19614.log" , "rb");
 	if (pFile==NULL) {fputs ("File error",stderr); exit (1);}
 	for (;;) {
     		size_t n = fread(buffer, 1, 1024, pFile);

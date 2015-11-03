@@ -52,19 +52,23 @@ class Vice final: public RpcService::Service{
 		log("read request received");
 		string full_path = *root_dir + recv_msg->msg();
 		log(full_path);
-		FILE *pFile = fopen ("small_file.txt" , "rb");
+		FILE *pFile = fopen(full_path.c_str() , "rb");
 		if (pFile == NULL) {
 			log("Error in opening file"); 
 			return Status::CANCELLED;
 		}
 		char buffer[BUF_SIZE];
 		for(;;){
-			size_t n = fread(buffer, 1, 1024, pFile);
+			size_t n = fread(buffer, 1, BUF_SIZE, pFile);
 			BytesMessage bytes;
+			log("Read %i", n);
 			bytes.set_msg(buffer, n);
 			bytes.set_size(n);
 			writer->Write(bytes);	
-			if (n < BUF_SIZE) { break; }
+			if (n < BUF_SIZE) { 
+				log("breaking");
+				break; 
+			}
 		}
 		fclose(pFile);
 		log("--------------------------------------------------");
