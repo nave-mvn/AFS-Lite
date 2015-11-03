@@ -47,23 +47,21 @@ using RpcPackage::RpcService;
 
 std::string* root_dir;
 
-/*
-void get_file_modified_time(string full_path, long* timestamp){
+long get_file_modified_time(string full_path){
 	log("Call to get file modified time"); 
+	struct stat attr;
+	stat(full_path.c_str(), &attr);
+	long timestamp = (long)attr.st_mtime;
+	return timestamp;
 }
-*/
 
 class Vice final: public RpcService::Service{
 
 	Status filetime(ServerContext* context, const StringMessage* recv_msg, LongMessage* reply) override {
-		log("read request received");
+		log("filetime request received");
 		string full_path = *root_dir + recv_msg->msg();
 		log(full_path);
-		struct stat attr;
-		stat(full_path.c_str(), &attr);
-		log("stat call returned"); 
-		long timestamp = (long)attr.st_mtime;
-		log("timestamp call2 returned"); 
+		long timestamp = get_file_modified_time(full_path); 
 		reply->set_msg(timestamp);
 		return Status::OK;
 	}
@@ -77,11 +75,7 @@ class Vice final: public RpcService::Service{
 			log("Error in opening file"); 
 			return Status::CANCELLED;
 		}
-		struct stat attr;
-		stat(full_path.c_str(), &attr);
-		log("stat call returned"); 
-		long timestamp = (long)attr.st_mtime;
-		log("timestamp call2 returned"); 
+		long timestamp = get_file_modified_time(full_path);
 		char buffer[BUF_SIZE];
 		for(;;){
 			size_t n = fread(buffer, 1, BUF_SIZE, pFile);
