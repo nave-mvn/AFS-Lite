@@ -8,7 +8,7 @@ service RpcService{
 	rpc stat_get_attr (StringMessage) returns (StatStruct) {}
 	rpc readdirectory (StringMessage) returns (DirMessage) {}
 	rpc accessdir (StringMessage) returns (DirMessage) {}
-	rpc readfile (ReadMessage) returns (stream BytesMessage) {}
+	rpc readfile (StringMessage) returns (stream BytesMessage) {}
 	rpc writefile (stream StringMessage) returns (BooleanMessage) {}
 }
 

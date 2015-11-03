@@ -42,30 +42,30 @@ using RpcPackage::DirMessage;
 using RpcPackage::DirEntry;
 using RpcPackage::RpcService;
 
+#define BUF_SIZE 4 * 1024
+
 std::string* root_dir;
-std::map<int, std::map<string, long> >* files_checked_out;
 
 class Vice final: public RpcService::Service{
 
-	Status readfile(ServerContext* context, const ReadMessage* recv_msg, ServerWriter<BytesMessage>* writer) override {
+	Status readfile(ServerContext* context, const StringMessage* recv_msg, ServerWriter<BytesMessage>* writer) override {
 		log("read request received");
-		string full_path = *root_dir + recv_msg->path();
+		string full_path = *root_dir + recv_msg->msg();
 		log(full_path);
-		int clientid = recv_msg->clientid();
-		std::fstream inf(full_path, std::ios::in);
-		char data;
-		int bytes = 0;
-		while( !inf.eof() ) {
-			log("%c", data);
-			bytes++;
-			BytesMessage f;
-			f.set_msg(&data);
-			writer->Write(f);
-    		}
-		log("Bytes read: %i", bytes);
-		inf.close();
-		// log as checked out
-		//files_checkout
+		FILE *pFile = fopen ("small_file.txt" , "rb");
+		if (pFile == NULL) {
+			log("Error in opening file"); 
+			return Status::CANCELLED;
+		}
+		char buffer[BUF_SIZE];
+		for(;;){
+			size_t n = fread(buffer, 1, 1024, pFile);
+			BytesMessage bytes;
+			bytes.set_msg(buffer, n);
+			writer->Write(bytes);	
+			if (n < BUF_SIZE) { break; }
+		}
+		fclose(pFile);
 		log("--------------------------------------------------");
 		return Status::OK;
 	}
@@ -111,7 +111,6 @@ class Vice final: public RpcService::Service{
 		log("--------------------------------------------------");
 		return Status::OK;
 	}
-
 };
 
 void run_server() {
@@ -136,7 +135,6 @@ void run_server() {
 int main(int argc, char** argv) {
 	open_err_log();
 	root_dir = new string(argv[1]);
-	files_checked_out = new std::map<int, std::map<string, long> >();
 	run_server();
 	return 0;
 }
