@@ -62,6 +62,7 @@ class Vice final: public RpcService::Service{
 			size_t n = fread(buffer, 1, 1024, pFile);
 			BytesMessage bytes;
 			bytes.set_msg(buffer, n);
+			bytes.set_size(n);
 			writer->Write(bytes);	
 			if (n < BUF_SIZE) { break; }
 		}

@@ -35,6 +35,7 @@ message StringMessage{
 
 message BytesMessage{
 	 bytes msg = 1;
+	 int32 size = 2;
 } 
 
 message ReadMessage{
