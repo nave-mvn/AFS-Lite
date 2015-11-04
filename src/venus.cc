@@ -214,6 +214,7 @@ static int venus_unlink(const char *path)
 	log("----------------------");
 	if (status.ok()){
 		if(deletefile.msg() == true){
+			log("no other hard links...deleting local cache");
 			invalidate_local_cache(path);
 		}
 		return 0;
