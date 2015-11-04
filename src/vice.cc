@@ -49,6 +49,13 @@ using RpcPackage::RpcService;
 
 std::string* root_dir;
 
+int get_file_links(string full_path){
+	log("Call to get file hard links"); 
+	struct stat attr;
+	stat(full_path.c_str(), &attr);
+	return (int)attr.st_nlink;
+}
+
 long get_file_modified_time(string full_path){
 	log("Call to get file modified time"); 
 	struct stat attr;
@@ -58,6 +65,28 @@ long get_file_modified_time(string full_path){
 }
 
 class Vice final: public RpcService::Service{
+	
+	Status unlinkfile(ServerContext* context, const StringMessage* path, BooleanMessage* reply) override {
+		log("unlink file request received");
+		string full_path = *root_dir + path->msg();
+		int hard_links = get_file_links(full_path);
+		int res = unlink(full_path.c_str());
+		if(res == 0){
+			if(hard_links == 1){
+				reply->set_msg(true);
+				log("delete file");
+			}
+			else{
+				reply->set_msg(false);
+				log("dont delete file");
+			}
+			return Status::OK;
+		}
+		else{
+			log("unlink file failed");
+			return Status::CANCELLED;
+		}
+	}
 	
 	Status removedir(ServerContext* context, const StringMessage* path, BooleanMessage* reply) override {
 		log("remove dir request received");
