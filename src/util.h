@@ -15,11 +15,19 @@
 
 #define BUF_SIZE 4 * 1024
 
+int client_id;
+
 using namespace std;
+
+string int_to_string(int a){
+	stringstream ss;
+	ss << a;
+	return ss.str();
+}
 
 void open_err_log(){
 	std::ofstream ofs;
-	ofs.open("/tmp/err.txt", std::ofstream::out | std::ofstream::trunc);
+	ofs.open("/tmp/err"+int_to_string(client_id)+".txt", std::ofstream::out | std::ofstream::trunc);
 	ofs.close();
 }
 
@@ -43,7 +51,7 @@ void log(const std::string fmt_str, ...) {
 	}
 	string toPrint = std::string(formatted.get());
 	ofstream err_file;
-	err_file.open ("/tmp/err.txt", ios::in|ios::app);
+	err_file.open ("/tmp/err"+int_to_string(client_id)+".txt", ios::in|ios::app);
 	err_file << toPrint << std::endl;
 	err_file.close();
 }
@@ -68,12 +76,6 @@ int copy_file(const char* original, const char* dest){
 	outfile.close();
 	fclose(pFile);
 	return 0;
-}
-
-string int_to_string(int a){
-	stringstream ss;
-	ss << a;
-	return ss.str();
 }
 
 timespec diff(timespec start, timespec end)

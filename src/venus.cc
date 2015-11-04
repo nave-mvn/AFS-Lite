@@ -58,7 +58,6 @@ using RpcPackage::RpcService;
 
 #define BUF_SIZE 4 * 1024
 
-int client_id;
 // hardcoded string -- have to change if hosting client on any other machine
 static const char *cache_dir = "/home/naveen/.afs_cache";
 static string* cache_dir_path;
