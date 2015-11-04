@@ -203,6 +203,22 @@ static int venus_release(const char *path, struct fuse_file_info *fi)
 	return 0;
 }
 
+static int venus_rmdir(const char* path){
+	log("remove dir %s called", path);
+	StringMessage dir_path;
+	BooleanMessage dummy;
+	dir_path.set_msg(string(path));
+	ClientContext context;
+	Status status = stub_->removedir(&context, dir_path, &dummy);
+	log("----------------------");
+	if (status.ok()){
+		return 0;
+	}
+	else{
+		return -errno;
+	}
+}
+
 static int venus_mkdir(const char* path, mode_t mode){
 	log("mkdir %s called", path);
 	StringMessage dir_path;
@@ -530,6 +546,7 @@ int main(int argc, char *argv[])
 	cached_files_local_access = new std::map<string, long>();
 	static struct fuse_operations venus_oper;
 	venus_oper.mkdir = venus_mkdir;
+	venus_oper.rmdir = venus_rmdir;
 	venus_oper.getattr = venus_getattr;
 	venus_oper.readdir = venus_readdir;
 	venus_oper.open = venus_open;

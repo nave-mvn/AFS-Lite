@@ -12,6 +12,7 @@ service RpcService{
 	rpc filetime (StringMessage) returns (LongMessage) {}
 	rpc writefile (stream BytesMessage) returns (LongMessage) {}
 	rpc makedir (StringMessage) returns (BooleanMessage) {}
+	rpc removedir (StringMessage) returns (BooleanMessage) {}
 }
 
 message StatStruct{
