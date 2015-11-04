@@ -71,6 +71,8 @@ std::map<string, long>* cached_files_remote_modified;
 
 std::map<string, long>* cached_files_local_access;//does not need to be persisted
 
+bool flush_file = false;
+
 static int get_remote_file_attr(const char* path, struct stat *stbuf){
 	ClientContext context;
 	StringMessage send_path;
@@ -204,9 +206,16 @@ static int venus_release(const char *path, struct fuse_file_info *fi)
 
 static int venus_flush(const char *path, struct fuse_file_info *fi)
 {
+	if(!flush_file){
+		return 0;
+	}
+	else{
+		flush_file = false;
+	}
 	log("flushing to server called");
 	// open file to read
-	FILE *pFile = fopen(path, "rb");
+	std::map<string, string>::iterator cached_files_it = cached_files->find(string(path));	
+	FILE *pFile = fopen(cached_files_it->second.c_str(), "rb");
 	if (pFile == NULL) {
 		log("Error in opening file to flush"); 
 		return -1;
@@ -216,6 +225,7 @@ static int venus_flush(const char *path, struct fuse_file_info *fi)
 	ClientContext context;
 	std::unique_ptr<ClientWriter<BytesMessage> > writer(stub_->writefile(&context, &timestampMsg));
 	file_path.set_msg(string(path));
+	log("Writing file path: %s", path);
 	writer->Write(file_path);
 	char buffer[BUF_SIZE];
 	for(;;){
@@ -235,7 +245,10 @@ static int venus_flush(const char *path, struct fuse_file_info *fi)
 	Status status = writer->Finish();
 	if (status.ok()) {
 		long timestamp = timestampMsg.msg();
-		//update mod map
+		std::map<string, long>::iterator cached_files_mod_it = cached_files_remote_modified->find(string(path));
+		if(cached_files_mod_it != cached_files_remote_modified->end()){
+			cached_files_mod_it->second = timestamp;
+		}
 	}
 	else{
 		return -errno;
@@ -335,7 +348,9 @@ static int venus_write(const char *path, const char *buf, size_t size, off_t off
 	close(fd);
 	//rename the copy - atomic operation
 	int result = rename(temp_file_path.c_str(), cached_file_path.c_str());
+	log("----------------------");
 	if(result == 0){
+		flush_file = true;
 		return res;
 	}
 	else{
@@ -400,13 +415,16 @@ static int venus_open(const char *path, struct fuse_file_info *fi)
 		return -errno;
 	}
 	if(file_last_mod_remote > file_last_mod_local){
-		log("File not of sync with Remote, revalidating local cache");
+		log("File out of sync with Remote, revalidating local cache");
 		if(invalidate_local_cache(path) == -1){
 			return -errno;
 		}
 		if(read_file_into_cache(path) == -1){
 			return -errno;
 		}
+	}
+	else{
+		log("File NOT out of sync reading from cache...");
 	}	
 	std::map<string, long>::iterator cached_files_access_it = cached_files_local_access->find(string(path));
 	if(cached_files_access_it == cached_files_local_access->end()){
@@ -433,17 +451,18 @@ static int venus_getattr(const char *path, struct stat *stbuf)
 		return 0;
 	}
 	std::map<string, string>::iterator cached_files_it = cached_files->find(string(path));
+	log("----------------------");
 	if(cached_files_it != cached_files->end()){
 		stat(cached_files_it->second.c_str(), stbuf);
 		return 0;
 	}
+	log("----------------------");
 	if(get_remote_file_attr(path, stbuf) == -1){
 		return -ENOENT;
 	}
 	else{
 		return 0;
 	}
-	log("----------------------");
 }
 
 static int venus_readdir(const char *path, void *buf, fuse_fill_dir_t filler, off_t offset, struct fuse_file_info *fi)
@@ -504,8 +523,8 @@ int main(int argc, char *argv[])
 	venus_oper.release = venus_release;
 	venus_oper.flush = venus_flush;
 	venus_oper.statfs = venus_statfs;
-	std::shared_ptr<grpc::Channel> channel = grpc::CreateChannel("192.168.1.126:50051", grpc::InsecureCredentials());
-	//std::shared_ptr<grpc::Channel> channel = grpc::CreateChannel("128.105.35.117:50051", grpc::InsecureCredentials());
+	//std::shared_ptr<grpc::Channel> channel = grpc::CreateChannel("192.168.1.126:50051", grpc::InsecureCredentials());
+	std::shared_ptr<grpc::Channel> channel = grpc::CreateChannel("128.105.32.140:50051", grpc::InsecureCredentials());
 	stub_ = RpcService::NewStub(channel);
 	argc = 3;
 	//why doesnt writes to my local cache persist between client restarts?
