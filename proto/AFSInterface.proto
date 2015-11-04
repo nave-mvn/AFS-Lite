@@ -13,6 +13,7 @@ service RpcService{
 	rpc writefile (stream BytesMessage) returns (LongMessage) {}
 	rpc makedir (StringMessage) returns (BooleanMessage) {}
 	rpc removedir (StringMessage) returns (BooleanMessage) {}
+	rpc unlinkfile (StringMessage) returns (BooleanMessage) {}
 }
 
 message StatStruct{

@@ -203,6 +203,26 @@ static int venus_release(const char *path, struct fuse_file_info *fi)
 	return 0;
 }
 
+static int venus_unlink(const char *path)
+{
+	log("unlink dir %s called", path);
+	StringMessage file_path;
+	BooleanMessage deletefile;
+	file_path.set_msg(string(path));
+	ClientContext context;
+	Status status = stub_->unlinkfile(&context, file_path, &deletefile);
+	log("----------------------");
+	if (status.ok()){
+		if(deletefile.msg() == true){
+			invalidate_local_cache(path);
+		}
+		return 0;
+	}
+	else{
+		return -errno;
+	}
+}
+
 static int venus_rmdir(const char* path){
 	log("remove dir %s called", path);
 	StringMessage dir_path;
@@ -575,6 +595,7 @@ int main(int argc, char *argv[])
 	venus_oper.getattr = venus_getattr;
 	venus_oper.readdir = venus_readdir;
 	venus_oper.open = venus_open;
+	venus_oper.unlink = venus_unlink;
 	venus_oper.write = venus_write;
 	venus_oper.read = venus_read;
 	venus_oper.chown = venus_chown;
