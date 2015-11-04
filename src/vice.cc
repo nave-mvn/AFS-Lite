@@ -155,6 +155,9 @@ class Vice final: public RpcService::Service{
 		string full_path = *root_dir + recv_msg->msg();
 		log(full_path);
 		int res = lstat(full_path.c_str(), &stbuf);
+		if(res == -1){
+			return Status::CANCELLED;
+		}
 		reply_struct->set_file_number(stbuf.st_ino);
 		reply_struct->set_time_access(stbuf.st_atime);
 		reply_struct->set_time_mod(stbuf.st_mtime);
