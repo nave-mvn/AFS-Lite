@@ -203,6 +203,22 @@ static int venus_release(const char *path, struct fuse_file_info *fi)
 	return 0;
 }
 
+static int venus_mkdir(const char* path, mode_t mode){
+	log("mkdir %s called", path);
+	StringMessage dir_path;
+	BooleanMessage dummy;
+	dir_path.set_msg(string(path));
+	ClientContext context;
+	Status status = stub_->mkdir(&context, dir_path, &dummy);
+	log("----------------------");
+	if (status.ok()){
+		return 0;
+	}
+	else{
+		return -errno;
+	}
+}
+
 static int venus_flush(const char *path, struct fuse_file_info *fi)
 {
 	if(!flush_file){

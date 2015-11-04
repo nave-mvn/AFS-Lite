@@ -11,6 +11,7 @@ service RpcService{
 	rpc readfile (StringMessage) returns (stream BytesMessage) {}
 	rpc filetime (StringMessage) returns (LongMessage) {}
 	rpc writefile (stream BytesMessage) returns (LongMessage) {}
+	rpc mkdir (StringMessage) returns (BooleanMessage) {}
 }
 
 message StatStruct{
