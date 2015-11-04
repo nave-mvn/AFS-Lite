@@ -50,6 +50,10 @@ using RpcPackage::BooleanMessage;
 using RpcPackage::LongMessage;
 using RpcPackage::RpcService;
 
+#define DEBUG_EXIT 2
+#define DEBUG_BYTES_SIZE 5
+//#define DEBUG true
+#define DEBUG false
 #define CACHE_SIZE 5
 
 int client_id;
@@ -251,21 +255,55 @@ static int venus_write(const char *path, const char *buf, size_t size, off_t off
 		return -errno;
 	}
 	log("Found file in local cache!");
+	string temp_file_path = *cache_dir_path + "temp_file";
 	string cached_file_path = cached_files_it->second;
-	fd = open(cached_file_path.c_str(), O_WRONLY);
+	// make a copy of original file
+	copy_file(cached_file_path.c_str(), temp_file_path.c_str());
+	// write to the copy
+	fd = open(temp_file_path.c_str(), O_WRONLY);
 	if (fd == -1){
 		log("could not open file for write");
 		return -errno;
 	}
 	log("Attempting pwrite");
-	res = pwrite(fd, buf, size, offset);
+	// replicate a client crash while writing to file
+	if(DEBUG){
+		size_t bytes_written = 0;
+		int write_size = DEBUG_BYTES_SIZE;
+		int iterations = 0;
+		while(bytes_written < size){
+			if(iterations == DEBUG_EXIT){
+				exit(-1);
+			}
+			log("Prompting for continue..");
+			res = pwrite(fd, buf+bytes_written, write_size, offset);
+			bytes_written += DEBUG_BYTES_SIZE; 
+			offset += DEBUG_BYTES_SIZE;
+			if(size - bytes_written < write_size){
+				write_size = size - bytes_written;
+			} 
+			iterations++;
+		}
+	}
+	else{
+		res = pwrite(fd, buf, size, offset);
+	}
 	if (res == -1){
 		log("write failed");
 		return -errno;
 	}
 	log("pwrite successful");
+	//fysnc the changes to the copy to disk
+	fsync(fd);
 	close(fd);
-	return res;
+	//rename the copy - atomic operation
+	int result = rename(temp_file_path.c_str(), cached_file_path.c_str());
+	if(result == 0){
+		return res;
+	}
+	else{
+		return -errno;
+	}
 }
 
 static int venus_read(const char *path, char *buf, size_t size, off_t offset, struct fuse_file_info *fi)
@@ -425,7 +463,7 @@ int main(int argc, char *argv[])
 	venus_oper.chown = venus_chown;
 	venus_oper.access = venus_access;
 	venus_oper.getxattr = venus_getxattr;
-	venus_oper.fsync = venus_fsync;
+	//venus_oper.fsync = venus_fsync;
 	venus_oper.release = venus_release;
 	venus_oper.flush = venus_flush;
 	venus_oper.statfs = venus_statfs;
@@ -433,5 +471,8 @@ int main(int argc, char *argv[])
 	//std::shared_ptr<grpc::Channel> channel = grpc::CreateChannel("128.105.35.117:50051", grpc::InsecureCredentials());
 	stub_ = RpcService::NewStub(channel);
 	argc = 3;
+	//why doesnt writes to my local cache persist between client restarts?
+	//clean up any temp files
+	//repopulate data str
 	return fuse_main(argc, argv, &venus_oper, NULL);
 }
