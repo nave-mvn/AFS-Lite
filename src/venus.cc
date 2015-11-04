@@ -190,6 +190,18 @@ void make_cache_dir(){
 	}	
 }
 
+static int venus_release(const char *path, struct fuse_file_info *fi)
+{
+	log("release called");
+        return 0;
+}
+
+static int venus_flush(const char *path, struct fuse_file_info *fi)
+{
+	log("flush called");
+        return 0;
+}
+
 static int venus_chown(const char *path, uid_t uid, gid_t gid)
 {
 	log("chown called");
@@ -214,13 +226,13 @@ static int venus_opendir(const char *path, struct fuse_file_info *fi)
 	return 0;
 }
 
+/*
 static int venus_fsync(const char *path, int isdatasync, struct fuse_file_info *fi)
 {
-	/* Just a stub.  This method is optional and can safely be left
-	   unimplemented */
 	log("fsync called");
 	return 0;
 }
+*/
 
 static int venus_statfs(const char *path, struct statvfs *stbuf)
 {
@@ -414,6 +426,8 @@ int main(int argc, char *argv[])
 	venus_oper.access = venus_access;
 	venus_oper.getxattr = venus_getxattr;
 	venus_oper.fsync = venus_fsync;
+	venus_oper.release = venus_release;
+	venus_oper.flush = venus_flush;
 	venus_oper.statfs = venus_statfs;
 	std::shared_ptr<grpc::Channel> channel = grpc::CreateChannel("192.168.1.126:50051", grpc::InsecureCredentials());
 	//std::shared_ptr<grpc::Channel> channel = grpc::CreateChannel("128.105.35.117:50051", grpc::InsecureCredentials());
