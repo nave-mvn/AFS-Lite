@@ -39,6 +39,7 @@ using RpcPackage::IntMessage;
 using RpcPackage::BytesMessage;
 using RpcPackage::ReadMessage;
 using RpcPackage::StringMessage;
+using RpcPackage::BooleanMessage;
 using RpcPackage::StatStruct;
 using RpcPackage::DirMessage;
 using RpcPackage::DirEntry;
@@ -57,6 +58,18 @@ long get_file_modified_time(string full_path){
 }
 
 class Vice final: public RpcService::Service{
+	
+	Status makedir(ServerContext* context, const StringMessage* path, BooleanMessage* reply) override {
+		log("writefile request received");
+		string full_path = *root_dir + path->msg();
+		int res = mkdir(full_path.c_str(), S_IRWXU | S_IRWXG | S_IROTH | S_IXOTH);		
+		if(res == 0){
+			return Status::OK;
+		}
+		else{
+			return Status::CANCELLED;
+		}
+	}
 
 	Status writefile(ServerContext* context, ServerReader<BytesMessage>* reader, LongMessage* reply) override {
 		log("writefile request received");
