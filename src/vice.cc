@@ -70,14 +70,14 @@ class Vice final: public RpcService::Service{
 		}
 		BytesMessage recv_msg;
 		while (reader->Read(&recv_msg)){
-   			log(recv_msg.msg());
-   			log("size: %i", recv_msg.size());
+			log(recv_msg.msg());
+			log("size: %i", recv_msg.size());
 			if(first){
 				dest_file_path = *root_dir + recv_msg.msg();
 				first = false;
 			}
 			else{
-   				log("Not first message");
+				log("Not first message");
 				int res = fwrite(recv_msg.msg().c_str(), 1, recv_msg.size(), writefile);
 				log("wrote %i", res);
 				//outfile.write(recv_msg.msg().c_str(), recv_msg.size());
@@ -86,9 +86,14 @@ class Vice final: public RpcService::Service{
 		fsync(writefd);
 		log("Synced file..closing");
 		fclose(writefile);
-		//outfile.close();
-		//do fsync and flush also here
-		return Status::OK;
+		int result = rename(temp_file_path.c_str(), dest_file_path.c_str());
+		if(result == 0){
+			reply->set_msg(get_file_modified_time(dest_file_path));
+			return Status::OK;
+		}
+		else{
+			return Status::CANCELLED;
+		}
 	}
 
 	Status filetime(ServerContext* context, const StringMessage* recv_msg, LongMessage* reply) override {
