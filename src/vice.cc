@@ -31,6 +31,7 @@ using grpc::Server;
 using grpc::ServerBuilder;
 using grpc::ServerWriter;
 using grpc::ServerContext;
+using grpc::ServerReader;
 using grpc::Status;
 
 using RpcPackage::LongMessage;
@@ -56,6 +57,39 @@ long get_file_modified_time(string full_path){
 }
 
 class Vice final: public RpcService::Service{
+
+	Status writefile(ServerContext* context, ServerReader<BytesMessage>* reader, LongMessage* reply) override {
+		log("writefile request received");
+		string dest_file_path;
+		string temp_file_path = "/tmp/temp_file";
+		bool first = true;
+		FILE* writefile = fopen(temp_file_path.c_str(), "wb");
+		int writefd = fileno(writefile);
+		if(writefd == -1){
+			log("Error in opening temp file");
+		}
+		BytesMessage recv_msg;
+		while (reader->Read(&recv_msg)){
+   			log(recv_msg.msg());
+   			log("size: %i", recv_msg.size());
+			if(first){
+				dest_file_path = *root_dir + recv_msg.msg();
+				first = false;
+			}
+			else{
+   				log("Not first message");
+				int res = fwrite(recv_msg.msg().c_str(), 1, recv_msg.size(), writefile);
+				log("wrote %i", res);
+				//outfile.write(recv_msg.msg().c_str(), recv_msg.size());
+			}
+		}
+		fsync(writefd);
+		log("Synced file..closing");
+		fclose(writefile);
+		//outfile.close();
+		//do fsync and flush also here
+		return Status::OK;
+	}
 
 	Status filetime(ServerContext* context, const StringMessage* recv_msg, LongMessage* reply) override {
 		log("filetime request received");
@@ -159,6 +193,7 @@ void run_server() {
 }
 
 int main(int argc, char** argv) {
+	//need to get rid of any temp file on restart
 	open_err_log();
 	root_dir = new string(argv[1]);
 	run_server();
