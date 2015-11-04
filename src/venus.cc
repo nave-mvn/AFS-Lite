@@ -209,7 +209,7 @@ static int venus_mkdir(const char* path, mode_t mode){
 	BooleanMessage dummy;
 	dir_path.set_msg(string(path));
 	ClientContext context;
-	Status status = stub_->mkdir(&context, dir_path, &dummy);
+	Status status = stub_->makedir(&context, dir_path, &dummy);
 	log("----------------------");
 	if (status.ok()){
 		return 0;
@@ -469,13 +469,16 @@ static int venus_getattr(const char *path, struct stat *stbuf)
 	log("----------------------");
 	if(cached_files_it != cached_files->end()){
 		stat(cached_files_it->second.c_str(), stbuf);
+		log("returning success at local");
 		return 0;
 	}
 	log("----------------------");
 	if(get_remote_file_attr(path, stbuf) == -1){
+		log("returning enoent");
 		return -ENOENT;
 	}
 	else{
+		log("returning success at remote");
 		return 0;
 	}
 }
@@ -526,6 +529,7 @@ int main(int argc, char *argv[])
 	cached_files_remote_modified = new std::map<string, long>();
 	cached_files_local_access = new std::map<string, long>();
 	static struct fuse_operations venus_oper;
+	venus_oper.mkdir = venus_mkdir;
 	venus_oper.getattr = venus_getattr;
 	venus_oper.readdir = venus_readdir;
 	venus_oper.open = venus_open;
