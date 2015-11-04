@@ -10,7 +10,7 @@ service RpcService{
 	rpc accessdir (StringMessage) returns (DirMessage) {}
 	rpc readfile (StringMessage) returns (stream BytesMessage) {}
 	rpc filetime (StringMessage) returns (LongMessage) {}
-	rpc writefile (stream StringMessage) returns (BooleanMessage) {}
+	rpc writefile (stream BytesMessage) returns (LongMessage) {}
 }
 
 message StatStruct{

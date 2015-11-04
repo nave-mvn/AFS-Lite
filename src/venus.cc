@@ -56,6 +56,8 @@ using RpcPackage::RpcService;
 #define DEBUG false
 #define CACHE_SIZE 5
 
+#define BUF_SIZE 4 * 1024
+
 int client_id;
 // hardcoded string -- have to change if hosting client on any other machine
 static const char *cache_dir = "/home/naveen/.afs_cache";
@@ -197,13 +199,48 @@ void make_cache_dir(){
 static int venus_release(const char *path, struct fuse_file_info *fi)
 {
 	log("release called");
-        return 0;
+	return 0;
 }
 
 static int venus_flush(const char *path, struct fuse_file_info *fi)
 {
-	log("flush called");
-        return 0;
+	log("flushing to server called");
+	// open file to read
+	FILE *pFile = fopen(path, "rb");
+	if (pFile == NULL) {
+		log("Error in opening file to flush"); 
+		return -1;
+	}
+	BytesMessage file_path;
+	LongMessage timestampMsg;
+	ClientContext context;
+	std::unique_ptr<ClientWriter<BytesMessage> > writer(stub_->writefile(&context, &timestampMsg));
+	file_path.set_msg(string(path));
+	writer->Write(file_path);
+	char buffer[BUF_SIZE];
+	for(;;){
+		size_t n = fread(buffer, 1, BUF_SIZE, pFile);
+		BytesMessage data;
+		log("Read: %i", n);
+		data.set_msg(buffer, n);
+		data.set_size(n);
+		writer->Write(data);
+    		if (n < BUF_SIZE) { 
+			break; 
+		}
+	}
+	log("Closing read file"); 
+	fclose(pFile);
+	writer->WritesDone();
+	Status status = writer->Finish();
+	if (status.ok()) {
+		long timestamp = timestampMsg.msg();
+		//update mod map
+	}
+	else{
+		return -errno;
+	}
+	return 0;
 }
 
 static int venus_chown(const char *path, uid_t uid, gid_t gid)
@@ -231,12 +268,12 @@ static int venus_opendir(const char *path, struct fuse_file_info *fi)
 }
 
 /*
-static int venus_fsync(const char *path, int isdatasync, struct fuse_file_info *fi)
-{
-	log("fsync called");
-	return 0;
-}
-*/
+   static int venus_fsync(const char *path, int isdatasync, struct fuse_file_info *fi)
+   {
+   log("fsync called");
+   return 0;
+   }
+ */
 
 static int venus_statfs(const char *path, struct statvfs *stbuf)
 {
