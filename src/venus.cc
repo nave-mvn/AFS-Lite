@@ -247,6 +247,7 @@ static int venus_flush(const char *path, struct fuse_file_info *fi)
 	// open file to read
 	std::map<string, string>::iterator cached_files_it = cached_files->find(string(path));	
 	FILE *pFile = fopen(cached_files_it->second.c_str(), "rb");
+	log("Writing from file path: %s", cached_files_it->second.c_str());
 	if (pFile == NULL) {
 		log("Error in opening file to flush"); 
 		return -1;
@@ -256,7 +257,7 @@ static int venus_flush(const char *path, struct fuse_file_info *fi)
 	ClientContext context;
 	std::unique_ptr<ClientWriter<BytesMessage> > writer(stub_->writefile(&context, &timestampMsg));
 	file_path.set_msg(string(path));
-	log("Writing file path: %s", path);
+	log("Writing to remote file path: %s", path);
 	writer->Write(file_path);
 	char buffer[BUF_SIZE];
 	for(;;){
@@ -427,6 +428,23 @@ static int venus_read(const char *path, char *buf, size_t size, off_t offset, st
 	return res;
 }
 
+static int venus_create(const char *path, mode_t mode, struct fuse_file_info *fi){
+	log("create file called");
+	string cached_file_name;
+	do{
+		cached_file_name = string(*cache_dir_path).append(random_string(10));
+	}while(cached_files->find(cached_file_name) != cached_files->end());
+	int fd = open(cached_file_name.c_str(), fi->flags, mode);
+        if (fd == -1){
+                return -errno;
+	}
+        fi->fh = fd;
+	log("new file cached at " + cached_file_name);
+	cached_files->insert(std::pair<string, string>(string(path), cached_file_name));
+	flush_file = true; 
+	return 0;
+}
+
 static int venus_open(const char *path, struct fuse_file_info *fi)
 {
 	//set file access time
@@ -535,6 +553,12 @@ static int venus_readdir(const char *path, void *buf, fuse_fill_dir_t filler, of
 	return res;
 }
 
+static int venus_utimens(const char *path, const struct timespec ts[2])
+{
+        return 0;
+}
+
+
 int main(int argc, char *argv[])
 {
 	client_id = atoi(argv[3]);
@@ -546,6 +570,7 @@ int main(int argc, char *argv[])
 	cached_files_local_access = new std::map<string, long>();
 	static struct fuse_operations venus_oper;
 	venus_oper.mkdir = venus_mkdir;
+	venus_oper.create = venus_create;
 	venus_oper.rmdir = venus_rmdir;
 	venus_oper.getattr = venus_getattr;
 	venus_oper.readdir = venus_readdir;
@@ -555,6 +580,7 @@ int main(int argc, char *argv[])
 	venus_oper.chown = venus_chown;
 	venus_oper.access = venus_access;
 	venus_oper.getxattr = venus_getxattr;
+	venus_oper.utimens = venus_utimens;
 	//venus_oper.fsync = venus_fsync;
 	venus_oper.release = venus_release;
 	venus_oper.flush = venus_flush;
