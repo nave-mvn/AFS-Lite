@@ -65,6 +65,32 @@ std::map<string, long>* cached_files_remote_modified;
 
 std::map<string, long>* cached_files_local_access;//does not need to be persisted
 
+static int get_remote_file_attr(const char* path, struct stat *stbuf){
+	ClientContext context;
+	StringMessage send_path;
+	StatStruct reply;
+	Status status;
+	send_path.set_msg(string(path));
+	status = stub_->stat_get_attr(&context, send_path, &reply);
+	if(status.ok()){
+		stbuf->st_dev = reply.device_id();
+		stbuf->st_ino = reply.file_number();
+		stbuf->st_mode = reply.file_mode();
+		stbuf->st_nlink = reply.hard_links();
+		stbuf->st_uid = 1000;
+		stbuf->st_gid = 1000;
+		stbuf->st_size = reply.file_size();
+		stbuf->st_atime = reply.time_access();
+		stbuf->st_mtime = reply.time_mod();
+		stbuf->st_ctime = reply.time_chng();
+		return 0;
+	}
+	else{
+		log("Retruning Error");
+		return -1;
+	}
+}
+
 static int invalidate_local_cache(const char* path){
 	log("invalidating file %s", path);
 	std::map<string, string>::iterator cached_files_it = cached_files->find(string(path));
@@ -202,6 +228,34 @@ static int venus_statfs(const char *path, struct statvfs *stbuf)
 	return 0;
 }
 
+static int venus_write(const char *path, const char *buf, size_t size, off_t offset, struct fuse_file_info *fi)
+{
+	log("write file called");
+	int fd;
+	int res;
+	std::map<string, string>::iterator cached_files_it = cached_files->find(string(path));
+	if(cached_files_it == cached_files->end()){
+		log("could not find file in local cache!");
+		return -errno;
+	}
+	log("Found file in local cache!");
+	string cached_file_path = cached_files_it->second;
+	fd = open(cached_file_path.c_str(), O_WRONLY);
+	if (fd == -1){
+		log("could not open file for write");
+		return -errno;
+	}
+	log("Attempting pwrite");
+	res = pwrite(fd, buf, size, offset);
+	if (res == -1){
+		log("write failed");
+		return -errno;
+	}
+	log("pwrite successful");
+	close(fd);
+	return res;
+}
+
 static int venus_read(const char *path, char *buf, size_t size, off_t offset, struct fuse_file_info *fi)
 {
 	log("read file called");
@@ -278,40 +332,31 @@ static int venus_open(const char *path, struct fuse_file_info *fi)
 	return 0;
 }
 
+
+
 static int venus_getattr(const char *path, struct stat *stbuf)
 {
 	log("getattr called");
-	StringMessage send_path;
-	StatStruct reply;
 	log("path: %s", path);
 	memset(stbuf, 0, sizeof(struct stat));
-	int res = 0;
 	if(strcmp(path, "/") == 0) {
-		stbuf->st_mode = S_IFDIR;
+		log("Is root dir");
+		stbuf->st_mode = S_IFDIR | 0755;
 		stbuf->st_nlink = 2;
-		return res;
+		return 0;
 	}
-	ClientContext context;
-	Status status;
-	send_path.set_msg(string(path));
-	status = stub_->stat_get_attr(&context, send_path, &reply);
-	if(status.ok()){
-		stbuf->st_dev = reply.device_id();
-		stbuf->st_ino = reply.file_number();
-		stbuf->st_mode = reply.file_mode();
-		stbuf->st_nlink = reply.hard_links();
-		stbuf->st_uid = reply.user_id();
-		stbuf->st_gid = reply.group_id();
-		stbuf->st_size = reply.file_size();
-		stbuf->st_atime = reply.time_access();
-		stbuf->st_mtime = reply.time_mod();
-		stbuf->st_ctime = reply.time_chng();
+	std::map<string, string>::iterator cached_files_it = cached_files->find(string(path));
+	if(cached_files_it != cached_files->end()){
+		stat(cached_files_it->second.c_str(), stbuf);
+		return 0;
+	}
+	if(get_remote_file_attr(path, stbuf) == -1){
+		return -ENOENT;
 	}
 	else{
-		res = -ENOENT;
+		return 0;
 	}
 	log("----------------------");
-	return res;
 }
 
 static int venus_readdir(const char *path, void *buf, fuse_fill_dir_t filler, off_t offset, struct fuse_file_info *fi)
@@ -363,14 +408,15 @@ int main(int argc, char *argv[])
 	venus_oper.getattr = venus_getattr;
 	venus_oper.readdir = venus_readdir;
 	venus_oper.open = venus_open;
+	venus_oper.write = venus_write;
 	venus_oper.read = venus_read;
 	venus_oper.chown = venus_chown;
 	venus_oper.access = venus_access;
 	venus_oper.getxattr = venus_getxattr;
 	venus_oper.fsync = venus_fsync;
 	venus_oper.statfs = venus_statfs;
-	//std::shared_ptr<grpc::Channel> channel = grpc::CreateChannel("192.168.1.126:50051", grpc::InsecureCredentials());
-	std::shared_ptr<grpc::Channel> channel = grpc::CreateChannel("128.105.35.117:50051", grpc::InsecureCredentials());
+	std::shared_ptr<grpc::Channel> channel = grpc::CreateChannel("192.168.1.126:50051", grpc::InsecureCredentials());
+	//std::shared_ptr<grpc::Channel> channel = grpc::CreateChannel("128.105.35.117:50051", grpc::InsecureCredentials());
 	stub_ = RpcService::NewStub(channel);
 	argc = 3;
 	return fuse_main(argc, argv, &venus_oper, NULL);
