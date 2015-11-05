@@ -69,9 +69,11 @@ std::unique_ptr<RpcService::Stub> stub_;
 std::map<string, string>* cached_files;
 std::map<string, long>* cached_files_remote_modified;
 
+int goffset = 0;
 bool flush_file = false;
 bool write_in_progress = false;
 bool is_crash = false;
+bool is_create = false;
 static int get_remote_file_attr(const char* path, struct stat *stbuf){
 	ClientContext context;
 	StringMessage send_path;
@@ -160,7 +162,7 @@ int read_file_into_cache(const char* path){
 		cached_file_name = string(*cache_dir_path).append(random_string(10));
 		found_unique_name = true;
 		for (std::map<string, string>::iterator it=cached_files->begin(); it!=cached_files->end(); ++it){
-    			if(it->second.compare(cached_file_name) == 0){//equal
+			if(it->second.compare(cached_file_name) == 0){//equal
 				found_unique_name = false;
 				break;
 			}
@@ -267,6 +269,7 @@ static int venus_mkdir(const char* path, mode_t mode){
 
 static int venus_flush(const char *path, struct fuse_file_info *fi)
 {
+	log("flush %s called", path);
 	if(!flush_file){
 		return 0;
 	}
@@ -274,31 +277,40 @@ static int venus_flush(const char *path, struct fuse_file_info *fi)
 		flush_file = false;
 		write_in_progress = false;
 	}
-	
-	string temp_file_path = *cache_dir_path + "temp_file";
-	if(is_crash){
-		is_crash = false;
-		int ret = remove(temp_file_path.c_str());
-		return ret;
-	}
-	
-	log("flushing to local disk");
-	int fd = open(temp_file_path.c_str(), O_WRONLY);
-	if (fd == -1){
-		log("could not open file for fsync");
-		return -errno;
-	}
-	//fysnc the changes to the copy to disk
-	fsync(fd);
-	close(fd);
-	//rename the copy - atomic operation
 	std::map<string, string>::iterator cached_files_it = cached_files->find(string(path));
 	string cached_file_path = cached_files_it->second;
-	int result = rename(temp_file_path.c_str(), cached_file_path.c_str());
-	if(result != 0){
-		return -errno;
-	}	
-	
+	log("cached file path  %s", cached_file_path.c_str());
+
+	if(!is_create){	
+		log("is not a create");
+		string temp_file_path = *cache_dir_path + "temp_file";
+		if(is_crash){
+			log("Is a crash %i", goffset);
+			is_crash = false;
+			int ret = remove(temp_file_path.c_str());
+			return ret;
+		}
+
+		log("flushing to local disk");
+		int fd = open(temp_file_path.c_str(), O_WRONLY);
+		if (fd == -1){
+			log("could not open file for fsync");
+			return -errno;
+		}
+		//fysnc the changes to the copy to disk
+		fsync(fd);
+		close(fd);
+		//rename the copy - atomic operation
+		int result = rename(temp_file_path.c_str(), cached_file_path.c_str());
+		if(result != 0){
+			return -errno;
+		}	
+	}
+	else{
+		log("IS a create");
+		is_create = false;
+	}
+
 	log("flushing to server called");
 	// open file to read
 	FILE *pFile = fopen(cached_file_path.c_str(), "rb");
@@ -322,7 +334,7 @@ static int venus_flush(const char *path, struct fuse_file_info *fi)
 		data.set_msg(buffer, n);
 		data.set_size(n);
 		writer->Write(data);
-    		if (n < BUF_SIZE) { 
+		if (n < BUF_SIZE) { 
 			break; 
 		}
 	}
@@ -331,12 +343,16 @@ static int venus_flush(const char *path, struct fuse_file_info *fi)
 	writer->WritesDone();
 	Status status = writer->Finish();
 	if (status.ok()) {
+		log("Send status OK"); 
 		long timestamp = timestampMsg.msg();
 		std::map<string, long>::iterator cached_files_mod_it = cached_files_remote_modified->find(string(path));
 		if(cached_files_mod_it != cached_files_remote_modified->end()){
 			cached_files_mod_it->second = timestamp;
-			record_mod_time(string(path) + SEPARATOR + any_to_string(timestamp));
 		}
+		else{
+			cached_files_remote_modified->insert(std::make_pair(string(path), timestamp));
+		}
+		record_mod_time(string(path) + SEPARATOR + any_to_string(timestamp));
 	}
 	else{
 		return -errno;
@@ -386,7 +402,8 @@ static int venus_write(const char *path, const char *buf, size_t size, off_t off
 {
 	log("write file called on %s, size: %i, offset:%i", path, size, offset);
 	log("flags %i, flush: %i, writepage:%i", fi->flags, fi->flush, fi->writepage);
-	if(1807<offset<1810){
+	if(1807<offset && offset<1810){
+		goffset = offset;
 		is_crash = true;
 	}
 	int fd;
@@ -468,21 +485,22 @@ static int venus_create(const char *path, mode_t mode, struct fuse_file_info *fi
 		cached_file_name = string(*cache_dir_path).append(random_string(10));
 		found_unique_name = true;
 		for (std::map<string, string>::iterator it=cached_files->begin(); it!=cached_files->end(); ++it){
-    			if(it->second.compare(cached_file_name) == 0){//equal
+			if(it->second.compare(cached_file_name) == 0){//equal
 				found_unique_name = false;
 				break;
 			}
 		}
 	}
 	int fd = open(cached_file_name.c_str(), fi->flags, mode);
-        if (fd == -1){
-                return -errno;
+	if (fd == -1){
+		return -errno;
 	}
-        fi->fh = fd;
+	fi->fh = fd;
 	log("new file cached at " + cached_file_name);
 	cached_files->insert(std::pair<string, string>(string(path), cached_file_name));
 	record_cache(string(path) + SEPARATOR + cached_file_name);
-	flush_file = true; 
+	flush_file = true;
+	is_create = true; 
 	return 0;
 }
 
@@ -587,7 +605,7 @@ static int venus_readdir(const char *path, void *buf, fuse_fill_dir_t filler, of
 
 static int venus_utimens(const char *path, const struct timespec ts[2])
 {
-        return 0;
+	return 0;
 }
 
 
