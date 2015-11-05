@@ -621,8 +621,8 @@ int main(int argc, char *argv[])
 	venus_oper.release = venus_release;
 	venus_oper.flush = venus_flush;
 	venus_oper.statfs = venus_statfs;
-	//std::shared_ptr<grpc::Channel> channel = grpc::CreateChannel("192.168.1.126:50051", grpc::InsecureCredentials());
-	std::shared_ptr<grpc::Channel> channel = grpc::CreateChannel("128.105.32.140:50051", grpc::InsecureCredentials());
+	std::shared_ptr<grpc::Channel> channel = grpc::CreateChannel("192.168.1.126:50051", grpc::InsecureCredentials());
+	//std::shared_ptr<grpc::Channel> channel = grpc::CreateChannel("128.105.32.140:50051", grpc::InsecureCredentials());
 	stub_ = RpcService::NewStub(channel);
 	argc = 3;
 	//why doesnt writes to my local cache persist between client restarts?
