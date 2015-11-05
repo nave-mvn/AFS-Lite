@@ -171,11 +171,16 @@ int read_file_into_cache(const char* path){
 	log("caching file" + cached_file_name);
 	output_file.open(cached_file_name, ios::out);
 	long remote_timestamp = 0;
+	timeval before_tval, after_tval;
+	gettimeofday(&before_tval, NULL);
 	while (reader->Read(&file)){
-		log("Received %i", file.size());
+		//log("Received %i", file.size());
 		output_file.write(file.msg().c_str(), file.size());
 		remote_timestamp = file.timestamp();
 	}
+	gettimeofday(&after_tval, NULL);
+	long time_diff = diff(before_tval, after_tval);
+	log("Server streaming, Time taken: %lu", time_diff);
 	Status status = reader->Finish();
 	if (status.ok()) {
 		log("Inital read download succeeded");
@@ -402,8 +407,8 @@ static int venus_write(const char *path, const char *buf, size_t size, off_t off
 {
 	log("write file called on %s, size: %i, offset:%i", path, size, offset);
 	log("flags %i, flush: %i, writepage:%i", fi->flags, fi->flush, fi->writepage);
-	if(1807<offset && offset<1810){
-		goffset = offset;
+	if(1807<size && size<1810){
+		goffset = size;
 		is_crash = true;
 	}
 	int fd;
@@ -639,8 +644,8 @@ int main(int argc, char *argv[])
 	venus_oper.release = venus_release;
 	venus_oper.flush = venus_flush;
 	venus_oper.statfs = venus_statfs;
-	std::shared_ptr<grpc::Channel> channel = grpc::CreateChannel("192.168.1.126:50051", grpc::InsecureCredentials());
-	//std::shared_ptr<grpc::Channel> channel = grpc::CreateChannel("128.105.32.140:50051", grpc::InsecureCredentials());
+	//std::shared_ptr<grpc::Channel> channel = grpc::CreateChannel("192.168.1.126:50051", grpc::InsecureCredentials());
+	std::shared_ptr<grpc::Channel> channel = grpc::CreateChannel("128.105.32.140:50051", grpc::InsecureCredentials());
 	stub_ = RpcService::NewStub(channel);
 	argc = 3;
 	//why doesnt writes to my local cache persist between client restarts?

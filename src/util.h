@@ -13,12 +13,19 @@
 #include <dirent.h>
 #include <unistd.h>
 #include <vector>
+#include <sys/time.h>
+#include <time.h>
 
 #define BUF_SIZE 4 * 1024
 
 int client_id;
 
 using namespace std;
+
+long diff(timeval start, timeval end)
+{
+	return (end.tv_sec-start.tv_sec)*1000000 + end.tv_usec-start.tv_usec;
+}
 
 void print_cached_files(std::map<string, string>* cached_files){
 	for (std::map<string, string>::iterator it=cached_files->begin(); it!=cached_files->end(); ++it){
