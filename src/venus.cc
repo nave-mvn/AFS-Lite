@@ -68,8 +68,6 @@ std::unique_ptr<RpcService::Stub> stub_;
 std::map<string, string>* cached_files;
 std::map<string, long>* cached_files_remote_modified;
 
-std::map<string, long>* cached_files_local_access;//does not need to be persisted
-
 bool flush_file = false;
 
 static int get_remote_file_attr(const char* path, struct stat *stbuf){
@@ -114,10 +112,6 @@ static int invalidate_local_cache(const char* path){
 		std::map<string, long>::iterator cached_files_mod_it = cached_files_remote_modified->find(string(path));
 		if(cached_files_mod_it != cached_files_remote_modified->end()){
 			cached_files_remote_modified->erase(cached_files_mod_it);
-		}
-		std::map<string, long>::iterator cached_files_local_it = cached_files_local_access->find(string(path));
-		if(cached_files_local_it != cached_files_local_access->end()){
-			cached_files_local_access->erase(cached_files_local_it);
 		}
 		return 0;
 	}
@@ -496,13 +490,6 @@ static int venus_open(const char *path, struct fuse_file_info *fi)
 	else{
 		log("File NOT out of sync reading from cache...");
 	}	
-	std::map<string, long>::iterator cached_files_access_it = cached_files_local_access->find(string(path));
-	if(cached_files_access_it == cached_files_local_access->end()){
-		cached_files_local_access->insert(std::pair<string, long>(string(path), time(NULL)));
-	}
-	else{
-		cached_files_access_it->second = time(NULL);
-	}
 	log("----------------------");
 	return 0;
 }
@@ -584,11 +571,11 @@ int main(int argc, char *argv[])
 {
 	client_id = atoi(argv[3]);
 	cache_dir_path = new string(string(cache_dir).append(int_to_string(client_id)).append("/"));
+	open_log();
 	open_err_log();
 	make_cache_dir();
 	cached_files = new std::map<string, string>();
 	cached_files_remote_modified = new std::map<string, long>();
-	cached_files_local_access = new std::map<string, long>();
 	static struct fuse_operations venus_oper;
 	venus_oper.mkdir = venus_mkdir;
 	venus_oper.create = venus_create;
