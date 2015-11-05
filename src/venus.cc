@@ -61,7 +61,7 @@ using RpcPackage::RpcService;
 // hardcoded string -- have to change if hosting client on any other machine
 static const char *cache_dir = "/home/naveen/.afs_cache";
 static string* cache_dir_path;
-
+static string SEPARATOR = "::";
 // The stub holds the RPC connection. In global scope.
 std::unique_ptr<RpcService::Stub> stub_;
 
@@ -109,10 +109,12 @@ static int invalidate_local_cache(const char* path){
 	{
 		log("file deleted successfully");
 		cached_files->erase(cached_files_it);
+		//need to log removal
 		std::map<string, long>::iterator cached_files_mod_it = cached_files_remote_modified->find(string(path));
 		if(cached_files_mod_it != cached_files_remote_modified->end()){
 			cached_files_remote_modified->erase(cached_files_mod_it);
 		}
+		//need to log removal
 		return 0;
 	}
 	else 
@@ -150,9 +152,17 @@ int read_file_into_cache(const char* path){
 	// wow a do-while loop!
 	// get a unique hash name
 	log("generating unique name");
-	do{
+	bool found_unique_name = false;
+	while(!found_unique_name){//wow this is inefficient!!
 		cached_file_name = string(*cache_dir_path).append(random_string(10));
-	}while(cached_files->find(cached_file_name) != cached_files->end());
+		found_unique_name = true;
+		for (std::map<string, string>::iterator it=cached_files->begin(); it!=cached_files->end(); ++it){
+    			if(it->second.compare(cached_file_name) == 0){//equal
+				found_unique_name = false;
+				break;
+			}
+		}
+	}
 	log("caching file" + cached_file_name);
 	output_file.open(cached_file_name, ios::out);
 	long remote_timestamp = 0;
@@ -164,8 +174,10 @@ int read_file_into_cache(const char* path){
 	Status status = reader->Finish();
 	if (status.ok()) {
 		log("Inital read download succeeded");
-		cached_files->insert(std::pair<string, string>(string(path), cached_file_name)); 
+		cached_files->insert(std::pair<string, string>(string(path), cached_file_name));
+		record_cache(string(path) + SEPARATOR + cached_file_name);
 		cached_files_remote_modified->insert(std::pair<string, long>(string(path), remote_timestamp)); 
+		record_mod_time(string(path) + SEPARATOR + any_to_string(remote_timestamp));
 		log("Remote timestamp is %lu", remote_timestamp);
 		return 0;
 	} 
@@ -295,6 +307,7 @@ static int venus_flush(const char *path, struct fuse_file_info *fi)
 		std::map<string, long>::iterator cached_files_mod_it = cached_files_remote_modified->find(string(path));
 		if(cached_files_mod_it != cached_files_remote_modified->end()){
 			cached_files_mod_it->second = timestamp;
+			record_mod_time(string(path) + SEPARATOR + any_to_string(timestamp));
 		}
 	}
 	else{
@@ -446,9 +459,17 @@ static int venus_read(const char *path, char *buf, size_t size, off_t offset, st
 static int venus_create(const char *path, mode_t mode, struct fuse_file_info *fi){
 	log("create file called");
 	string cached_file_name;
-	do{
+	bool found_unique_name = false;
+	while(!found_unique_name){//wow this is inefficient!!
 		cached_file_name = string(*cache_dir_path).append(random_string(10));
-	}while(cached_files->find(cached_file_name) != cached_files->end());
+		found_unique_name = true;
+		for (std::map<string, string>::iterator it=cached_files->begin(); it!=cached_files->end(); ++it){
+    			if(it->second.compare(cached_file_name) == 0){//equal
+				found_unique_name = false;
+				break;
+			}
+		}
+	}
 	int fd = open(cached_file_name.c_str(), fi->flags, mode);
         if (fd == -1){
                 return -errno;
@@ -456,6 +477,7 @@ static int venus_create(const char *path, mode_t mode, struct fuse_file_info *fi
         fi->fh = fd;
 	log("new file cached at " + cached_file_name);
 	cached_files->insert(std::pair<string, string>(string(path), cached_file_name));
+	record_cache(string(path) + SEPARATOR + cached_file_name);
 	flush_file = true; 
 	return 0;
 }
@@ -571,11 +593,14 @@ int main(int argc, char *argv[])
 {
 	client_id = atoi(argv[3]);
 	cache_dir_path = new string(string(cache_dir).append(int_to_string(client_id)).append("/"));
-	open_log();
 	open_err_log();
 	make_cache_dir();
 	cached_files = new std::map<string, string>();
 	cached_files_remote_modified = new std::map<string, long>();
+	recover_cached_files(cached_files);
+	//print_cached_files(cached_files);
+	recover_mod_time(cached_files_remote_modified);
+	//print_mod_time(cached_files_remote_modified);
 	static struct fuse_operations venus_oper;
 	venus_oper.mkdir = venus_mkdir;
 	venus_oper.create = venus_create;
