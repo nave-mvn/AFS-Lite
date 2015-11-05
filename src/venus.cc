@@ -70,7 +70,8 @@ std::map<string, string>* cached_files;
 std::map<string, long>* cached_files_remote_modified;
 
 bool flush_file = false;
-
+bool write_in_progress = false;
+bool is_crash = false;
 static int get_remote_file_attr(const char* path, struct stat *stbuf){
 	ClientContext context;
 	StringMessage send_path;
@@ -271,12 +272,37 @@ static int venus_flush(const char *path, struct fuse_file_info *fi)
 	}
 	else{
 		flush_file = false;
+		write_in_progress = false;
 	}
+	
+	string temp_file_path = *cache_dir_path + "temp_file";
+	if(is_crash){
+		is_crash = false;
+		int ret = remove(temp_file_path.c_str());
+		return ret;
+	}
+	
+	log("flushing to local disk");
+	int fd = open(temp_file_path.c_str(), O_WRONLY);
+	if (fd == -1){
+		log("could not open file for fsync");
+		return -errno;
+	}
+	//fysnc the changes to the copy to disk
+	fsync(fd);
+	close(fd);
+	//rename the copy - atomic operation
+	std::map<string, string>::iterator cached_files_it = cached_files->find(string(path));
+	string cached_file_path = cached_files_it->second;
+	int result = rename(temp_file_path.c_str(), cached_file_path.c_str());
+	if(result != 0){
+		return -errno;
+	}	
+	
 	log("flushing to server called");
 	// open file to read
-	std::map<string, string>::iterator cached_files_it = cached_files->find(string(path));	
-	FILE *pFile = fopen(cached_files_it->second.c_str(), "rb");
-	log("Writing from file path: %s", cached_files_it->second.c_str());
+	FILE *pFile = fopen(cached_file_path.c_str(), "rb");
+	log("Writing from file path: %s", cached_file_path.c_str());
 	if (pFile == NULL) {
 		log("Error in opening file to flush"); 
 		return -1;
@@ -358,7 +384,11 @@ static int venus_statfs(const char *path, struct statvfs *stbuf)
 
 static int venus_write(const char *path, const char *buf, size_t size, off_t offset, struct fuse_file_info *fi)
 {
-	log("write file called");
+	log("write file called on %s, size: %i, offset:%i", path, size, offset);
+	log("flags %i, flush: %i, writepage:%i", fi->flags, fi->flush, fi->writepage);
+	if(1807<offset<1810){
+		is_crash = true;
+	}
 	int fd;
 	int res;
 	std::map<string, string>::iterator cached_files_it = cached_files->find(string(path));
@@ -370,7 +400,11 @@ static int venus_write(const char *path, const char *buf, size_t size, off_t off
 	string temp_file_path = *cache_dir_path + "temp_file";
 	string cached_file_path = cached_files_it->second;
 	// make a copy of original file
-	copy_file(cached_file_path.c_str(), temp_file_path.c_str());
+	if(!write_in_progress){
+		log("first write...creating temp file");
+		copy_file(cached_file_path.c_str(), temp_file_path.c_str());
+		write_in_progress = true;
+	}
 	// write to the copy
 	fd = open(temp_file_path.c_str(), O_WRONLY);
 	if (fd == -1){
@@ -378,46 +412,14 @@ static int venus_write(const char *path, const char *buf, size_t size, off_t off
 		return -errno;
 	}
 	log("Attempting pwrite");
-	// replicate a client crash while writing to file
-	if(DEBUG){
-		size_t bytes_written = 0;
-		int write_size = DEBUG_BYTES_SIZE;
-		int iterations = 0;
-		while(bytes_written < size){
-			if(iterations == DEBUG_EXIT){
-				exit(-1);
-			}
-			log("Prompting for continue..");
-			res = pwrite(fd, buf+bytes_written, write_size, offset);
-			bytes_written += DEBUG_BYTES_SIZE; 
-			offset += DEBUG_BYTES_SIZE;
-			if(size - bytes_written < write_size){
-				write_size = size - bytes_written;
-			} 
-			iterations++;
-		}
-	}
-	else{
-		res = pwrite(fd, buf, size, offset);
-	}
+	res = pwrite(fd, buf, size, offset);
 	if (res == -1){
 		log("write failed");
 		return -errno;
 	}
-	log("pwrite successful");
-	//fysnc the changes to the copy to disk
-	fsync(fd);
 	close(fd);
-	//rename the copy - atomic operation
-	int result = rename(temp_file_path.c_str(), cached_file_path.c_str());
-	log("----------------------");
-	if(result == 0){
-		flush_file = true;
-		return res;
-	}
-	else{
-		return -errno;
-	}
+	flush_file = true;
+	return res;
 }
 
 static int venus_read(const char *path, char *buf, size_t size, off_t offset, struct fuse_file_info *fi)
@@ -517,8 +519,6 @@ static int venus_open(const char *path, struct fuse_file_info *fi)
 	log("----------------------");
 	return 0;
 }
-
-
 
 static int venus_getattr(const char *path, struct stat *stbuf)
 {

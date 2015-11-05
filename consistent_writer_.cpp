@@ -1,18 +1,9 @@
 #include <string>
-#include <sstream>
 #include <iostream>
 #include <fstream>
-#include <time.h>
-#include <algorithm>
-#include <stdarg.h>  // For va_start, etc.
-#include <memory>    // For std::unique_ptr
-#include <fcntl.h>
 #include <stdlib.h>
 #include <stdio.h>
-#include <sys/stat.h>
-#include <dirent.h>
-#include <unistd.h>
-#include <vector>
+#include <ctype.h>
 
 using namespace std;
 
@@ -49,13 +40,18 @@ int main(int argc, char *argv[]){
 		char c;
 		cout << "Enter an alphabet: ";
   		cin >> c;
+		if(!isalpha(c)){
+			// dereference null, cause seg fault
+			//volatile int *p = reinterpret_cast<volatile int*>(0);
+    			//*p = 0x1337D00D;	
+			abort();
+		}
 		char buf[10000];
 		for(int j=0; j<10000; ++j){
 			buf[j] = c;
 		}
 		fwrite(buf, 1, 10000, writefile);	
 	}
-
 	fclose(writefile);
 	// if receive a number, then crash
 }
