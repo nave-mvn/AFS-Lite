@@ -62,6 +62,7 @@ using RpcPackage::RpcService;
 static const char *cache_dir = "/home/naveen/.afs_cache";
 static string* cache_dir_path;
 static string SEPARATOR = "::";
+static string DELETOR = "!";
 // The stub holds the RPC connection. In global scope.
 std::unique_ptr<RpcService::Stub> stub_;
 
@@ -109,10 +110,11 @@ static int invalidate_local_cache(const char* path){
 	{
 		log("file deleted successfully");
 		cached_files->erase(cached_files_it);
-		//need to log removal
+		record_cache(DELETOR + string(path));
 		std::map<string, long>::iterator cached_files_mod_it = cached_files_remote_modified->find(string(path));
 		if(cached_files_mod_it != cached_files_remote_modified->end()){
 			cached_files_remote_modified->erase(cached_files_mod_it);
+			record_mod_time(DELETOR + string(path));
 		}
 		//need to log removal
 		return 0;

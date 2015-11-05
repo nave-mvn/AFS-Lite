@@ -64,10 +64,19 @@ void recover_cached_files(std::map<string, string>* cached_files){
 		return;
 	}
 	for(std::string line; getline(input, line);){
+		int del_index = line.find("!");
+		if(del_index == 0){
+			string file_name = line.substr(1, line.size());
+			std::map<string, string>::iterator cached_files_it = cached_files->find(file_name);
+			if(cached_files_it != cached_files->end()){
+				cached_files->erase(cached_files_it);
+			}
+			continue;
+		}
 		int sep_index = line.find("::");
 		string file_name = line.substr(0, sep_index);
 		string cached_name = line.substr(sep_index+2, line.size());
-		std::map<string, string>::iterator cached_files_it = cached_files->find(string(file_name));
+		std::map<string, string>::iterator cached_files_it = cached_files->find(file_name);
 		if(cached_files_it == cached_files->end()){
 			cached_files->insert(std::make_pair(file_name, cached_name));
 		}
@@ -83,10 +92,19 @@ void recover_mod_time(std::map<string, long>* cached_mod_time){
 		return;
 	}
 	for(std::string line; getline(input, line);){
+		int del_index = line.find("!");
+		if(del_index == 0){
+			string file_name = line.substr(1, line.size());
+			std::map<string, long>::iterator cached_mod_it = cached_mod_time->find(file_name);
+			if(cached_mod_it != cached_mod_time->end()){
+				cached_mod_time->erase(cached_mod_it);
+			}
+			continue;
+		}
 		int sep_index = line.find("::");
 		string file_name = line.substr(0, sep_index);
 		long mod_time = stol(line.substr(sep_index+2, line.size()), NULL);
-		std::map<string, long>::iterator mod_time_it = cached_mod_time->find(string(file_name));
+		std::map<string, long>::iterator mod_time_it = cached_mod_time->find(file_name);
 		if(mod_time_it == cached_mod_time->end()){
 			cached_mod_time->insert(std::make_pair(file_name, mod_time));
 		}
